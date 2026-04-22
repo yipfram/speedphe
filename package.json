@@ -11,7 +11,7 @@
     "format": "bunx prettier --write .",
     "format:check": "bunx prettier --check .",
     "typecheck": "bunx tsc --noEmit",
-    "db:migrate": "node db-migrate.js",
+    "db:migrate": "bun db-migrate.js",
     "prepare": "bunx husky"
   },
   "lint-staged": {
