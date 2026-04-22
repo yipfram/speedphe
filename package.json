@@ -1,6 +1,7 @@
 {
   "name": "casphe",
   "version": "0.1.0",
+  "packageManager": "bun@1.2.21",
   "private": true,
   "scripts": {
     "dev": "bunx next dev",
