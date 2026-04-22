@@ -103,6 +103,18 @@ export default function Speedtest({ place, onComplete }: SpeedtestProps) {
             </svg>
             Run Speed Test
           </button>
+          <p className="mt-3 text-xs text-[var(--text-muted)]">
+            Test runs against{' '}
+            <a
+              href="https://github.com/cloudflare/speedtest/"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-[var(--primary)] underline underline-offset-2"
+            >
+              Cloudflare speed test servers
+            </a>
+            .
+          </p>
         </div>
       )}
 
