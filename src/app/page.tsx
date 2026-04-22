@@ -8,6 +8,7 @@ import { AddPlacePanel } from '@/components/home/AddPlacePanel';
 import { PlaceDetailsPanel } from '@/components/home/PlaceDetailsPanel';
 import { PlacesSidebar } from '@/components/home/PlacesSidebar';
 import type { NearbyPlace, Place } from '@/lib/db';
+import { createLoggedClientError, isLoggedClientError, logClientError } from '@/lib/logging';
 
 const DEFAULT_LOCATION = { lat: 48.8566, lng: 2.3522 };
 
@@ -44,15 +45,31 @@ export default function Home() {
 
     try {
       const response = await fetch(`/api/places?lat=${lat}&lng=${lng}&radius=10`);
-      const data: { error?: string; places?: NearbyPlace[] } = await response.json();
+      const data: { error?: string; places?: NearbyPlace[]; requestId?: string } =
+        await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error ?? 'Failed to load places');
+        const errorMessage = data.error ?? 'Failed to load places';
+
+        logClientError('client.fetch.error', {
+          action: 'places.load_nearby',
+          endpoint: '/api/places',
+          status: response.status,
+          requestId: data.requestId,
+          message: errorMessage,
+        });
+        throw createLoggedClientError(errorMessage);
       }
 
       setPlaces(data.places ?? []);
     } catch (error) {
-      console.error('Failed to load places:', error);
+      if (!isLoggedClientError(error)) {
+        logClientError('client.fetch.error', {
+          action: 'places.load_nearby',
+          endpoint: '/api/places',
+          message: error instanceof Error ? error.message : 'Failed to load places',
+        });
+      }
       setPlacesError(error instanceof Error ? error.message : 'Failed to load places');
     } finally {
       setIsLoading(false);
@@ -66,6 +83,9 @@ export default function Home() {
     };
 
     if (!navigator.geolocation) {
+      logClientError('geolocation.fallback', {
+        reason: 'unsupported',
+      });
       initializeLocation(DEFAULT_LOCATION);
       return;
     }
@@ -78,6 +98,9 @@ export default function Home() {
         });
       },
       () => {
+        logClientError('geolocation.fallback', {
+          reason: 'permission_denied_or_unavailable',
+        });
         initializeLocation(DEFAULT_LOCATION);
       }
     );
@@ -138,7 +161,21 @@ export default function Home() {
           lng: addPlaceDraft.lng,
         }),
       });
-      const data: { place: Place } = await response.json();
+      const data: { error?: string; place?: Place; requestId?: string } = await response.json();
+
+      if (!response.ok || !data.place) {
+        const errorMessage = data.error ?? 'Failed to add place';
+
+        logClientError('client.fetch.error', {
+          action: 'places.create',
+          endpoint: '/api/places',
+          status: response.status,
+          requestId: data.requestId,
+          message: errorMessage,
+        });
+        throw createLoggedClientError(errorMessage);
+      }
+
       const createdPlace: NearbyPlace = {
         ...data.place,
         distance_km: 0,
@@ -149,7 +186,13 @@ export default function Home() {
       setSelectedPlace(data.place);
       resetAddPlaceDraft();
     } catch (error) {
-      console.error('Failed to add place:', error);
+      if (!isLoggedClientError(error)) {
+        logClientError('client.fetch.error', {
+          action: 'places.create',
+          endpoint: '/api/places',
+          message: error instanceof Error ? error.message : 'Failed to add place',
+        });
+      }
     }
   }, [addPlaceDraft, resetAddPlaceDraft]);
 

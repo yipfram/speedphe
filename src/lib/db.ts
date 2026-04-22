@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { logServerEvent } from '@/lib/logging';
 
 let _pool: Pool | null = null;
 
@@ -6,6 +7,8 @@ type ErrorWithDetails = Error & {
   cause?: unknown;
   code?: string;
   errors?: unknown[];
+  hostname?: string;
+  syscall?: string;
 };
 
 const CONNECTION_ERROR_CODES = new Set([
@@ -37,8 +40,20 @@ function collectErrorCandidates(error: unknown, visited = new Set<unknown>()): E
   return [currentError, ...collectErrorCandidates(currentError.cause, visited), ...nestedErrors];
 }
 
-export function getDatabaseErrorDetails(error: unknown): { message: string; status: number } {
+export function getDatabaseErrorDetails(error: unknown): {
+  classification: 'connection_error' | 'dns_resolution' | 'query_error';
+  errorCode?: string;
+  hostname?: string;
+  message: string;
+  status: number;
+  syscall?: string;
+} {
   const candidates = collectErrorCandidates(error);
+  const matchingCandidate =
+    candidates.find(
+      (candidate) =>
+        candidate.code === 'EAI_AGAIN' || candidate.message.toLowerCase().includes('getaddrinfo')
+    ) ?? candidates[0];
   const hasDnsResolutionIssue = candidates.some(
     (candidate) =>
       candidate.code === 'EAI_AGAIN' || candidate.message.toLowerCase().includes('getaddrinfo')
@@ -57,23 +72,35 @@ export function getDatabaseErrorDetails(error: unknown): { message: string; stat
 
   if (hasDnsResolutionIssue) {
     return {
+      classification: 'dns_resolution',
+      errorCode: matchingCandidate?.code,
+      hostname: matchingCandidate?.hostname,
       message:
         'Database host could not be resolved. Check DATABASE_URL and the server DNS/network configuration.',
       status: 503,
+      syscall: matchingCandidate?.syscall,
     };
   }
 
   if (isConnectionIssue) {
     return {
+      classification: 'connection_error',
+      errorCode: matchingCandidate?.code,
+      hostname: matchingCandidate?.hostname,
       message:
         'Database connection timed out. Check DATABASE_URL and that PostgreSQL is reachable.',
       status: 503,
+      syscall: matchingCandidate?.syscall,
     };
   }
 
   return {
+    classification: 'query_error',
+    errorCode: matchingCandidate?.code,
+    hostname: matchingCandidate?.hostname,
     message: 'Database request failed.',
     status: 500,
+    syscall: matchingCandidate?.syscall,
   };
 }
 
@@ -81,14 +108,29 @@ export function getPool(): Pool {
   if (!_pool) {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
+      logServerEvent('error', 'config.missing_env', {
+        context: {
+          variable: 'DATABASE_URL',
+        },
+      });
       throw new Error('Missing DATABASE_URL environment variable');
     }
 
     const connectionTimeoutMs = Number(process.env.DB_CONNECTION_TIMEOUT_MS ?? '5000');
+    const parsedDatabaseUrl = new URL(databaseUrl);
 
     _pool = new Pool({
       connectionString: databaseUrl,
       connectionTimeoutMillis: Number.isFinite(connectionTimeoutMs) ? connectionTimeoutMs : 5000,
+    });
+
+    logServerEvent('info', 'db.pool.init', {
+      context: {
+        databaseHost: parsedDatabaseUrl.hostname,
+        hasDatabaseUrl: true,
+        hasSslMode: Boolean(parsedDatabaseUrl.searchParams.get('sslmode')),
+        timeoutMs: Number.isFinite(connectionTimeoutMs) ? connectionTimeoutMs : 5000,
+      },
     });
   }
   return _pool;

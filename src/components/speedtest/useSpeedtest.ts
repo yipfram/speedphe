@@ -2,6 +2,7 @@
 
 import type { Results } from '@cloudflare/speedtest';
 import SpeedTest from '@cloudflare/speedtest';
+import { createLoggedClientError, isLoggedClientError, logClientError } from '@/lib/logging';
 import { useEffect, useRef, useState } from 'react';
 
 interface UseSpeedtestParams {
@@ -78,9 +79,19 @@ export function useSpeedtest({ placeId, onComplete }: UseSpeedtestParams) {
         packet_loss: null,
       }),
     });
+    const data: { error?: string; requestId?: string } = await response.json();
 
     if (!response.ok) {
-      throw new Error('Failed to save speedtest results');
+      const errorMessage = data.error ?? 'Failed to save speedtest results';
+
+      logClientError('client.fetch.error', {
+        action: 'speedtests.save',
+        endpoint: '/api/speedtests',
+        status: response.status,
+        requestId: data.requestId,
+        message: errorMessage,
+      });
+      throw createLoggedClientError(errorMessage);
     }
   };
 
@@ -141,7 +152,14 @@ export function useSpeedtest({ placeId, onComplete }: UseSpeedtestParams) {
           });
           onComplete();
         } catch (saveError) {
-          console.error('Speedtest save error:', saveError);
+          if (!isLoggedClientError(saveError)) {
+            logClientError('client.fetch.error', {
+              action: 'speedtests.save',
+              endpoint: '/api/speedtests',
+              message:
+                saveError instanceof Error ? saveError.message : 'Failed to save speedtest results',
+            });
+          }
           setError('Test completed, but saving the results failed.');
         }
       };
@@ -153,7 +171,11 @@ export function useSpeedtest({ placeId, onComplete }: UseSpeedtestParams) {
 
       engineRef.current.play();
     } catch (err) {
-      console.error('Speedtest error:', err);
+      logClientError('client.fetch.error', {
+        action: 'speedtests.initialize',
+        endpoint: 'cloudflare-speedtest',
+        message: err instanceof Error ? err.message : 'Failed to initialize speedtest',
+      });
       setError('Failed to initialize speedtest');
       setStatus('idle');
     }

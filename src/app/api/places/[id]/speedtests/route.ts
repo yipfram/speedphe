@@ -1,15 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getDatabaseErrorDetails, getPool } from '@/lib/db';
 import { getClientIp } from '@/lib/getClientIp';
+import {
+  apiErrorResponse,
+  apiJsonResponse,
+  createApiRequestContext,
+  runLoggedQuery,
+} from '@/lib/api-logging';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const pool = getPool();
+  const requestContext = createApiRequestContext(request, '/api/places/[id]/speedtests');
   const { id } = await params;
   const { searchParams } = new URL(request.url);
   const limit = searchParams.get('limit') || '10';
 
   try {
-    const result = await pool.query(
+    const pool = getPool();
+    const result = await runLoggedQuery(
+      pool,
       `SELECT
          id,
          place_id,
@@ -23,28 +31,35 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        WHERE place_id = $1
        ORDER BY created_at DESC
        LIMIT $2`,
-      [id, parseInt(limit)]
+      [id, parseInt(limit, 10)],
+      requestContext,
+      'places.speedtests.list'
     );
 
-    return NextResponse.json({ speedtests: result.rows || [] });
+    return apiJsonResponse(
+      requestContext,
+      { speedtests: result.rows || [] },
+      { context: { resultCount: result.rows.length } }
+    );
   } catch (error) {
-    console.error('Error fetching speedtests:', error);
     const { message, status } = getDatabaseErrorDetails(error);
 
-    return NextResponse.json({ error: message }, { status });
+    return apiErrorResponse(requestContext, message, error, { status });
   }
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const pool = getPool();
+  const requestContext = createApiRequestContext(request, '/api/places/[id]/speedtests');
   const { id } = await params;
 
   try {
+    const pool = getPool();
     const body = await request.json();
     const { download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss } = body;
 
     if (download_mbps === undefined || upload_mbps === undefined || latency_ms === undefined) {
-      return NextResponse.json(
+      return apiJsonResponse(
+        requestContext,
         { error: 'download_mbps, upload_mbps, and latency_ms are required' },
         { status: 400 }
       );
@@ -52,7 +67,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const clientIp = getClientIp(request);
 
-    const result = await pool.query(
+    const result = await runLoggedQuery(
+      pool,
       `INSERT INTO speedtests (place_id, download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss, client_ip)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, place_id, download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss, created_at`,
@@ -64,14 +80,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         jitter_ms || null,
         packet_loss || null,
         clientIp || null,
-      ]
+      ],
+      requestContext,
+      'places.speedtests.create'
     );
 
-    return NextResponse.json({ speedtest: result.rows[0] });
+    return apiJsonResponse(requestContext, { speedtest: result.rows[0] }, { status: 201 });
   } catch (error) {
-    console.error('Error creating speedtest:', error);
     const { message, status } = getDatabaseErrorDetails(error);
 
-    return NextResponse.json({ error: message }, { status });
+    return apiErrorResponse(requestContext, message, error, { status });
   }
 }

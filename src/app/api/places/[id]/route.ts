@@ -1,23 +1,34 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getDatabaseErrorDetails, getPool } from '@/lib/db';
+import {
+  apiErrorResponse,
+  apiJsonResponse,
+  createApiRequestContext,
+  runLoggedQuery,
+} from '@/lib/api-logging';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const pool = getPool();
+  const requestContext = createApiRequestContext(request, '/api/places/[id]');
   const { id } = await params;
 
   try {
-    const placeResult = await pool.query(
+    const pool = getPool();
+    const placeResult = await runLoggedQuery(
+      pool,
       `SELECT id, name, address, lat, lng, google_place_id, created_at
        FROM places
        WHERE id = $1`,
-      [id]
+      [id],
+      requestContext,
+      'places.get'
     );
 
     if (placeResult.rows.length === 0) {
-      return NextResponse.json({ error: 'Place not found' }, { status: 404 });
+      return apiJsonResponse(requestContext, { error: 'Place not found' }, { status: 404 });
     }
 
-    const statsResult = await pool.query(
+    const statsResult = await runLoggedQuery(
+      pool,
       `SELECT
         AVG(download_mbps)::FLOAT AS avg_download,
         AVG(upload_mbps)::FLOAT AS avg_upload,
@@ -28,17 +39,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         MAX(created_at) AS last_test
       FROM speedtests
       WHERE place_id = $1`,
-      [id]
+      [id],
+      requestContext,
+      'places.stats'
     );
 
-    return NextResponse.json({
-      place: placeResult.rows[0],
-      stats: statsResult.rows[0] || null,
-    });
+    return apiJsonResponse(
+      requestContext,
+      {
+        place: placeResult.rows[0],
+        stats: statsResult.rows[0] || null,
+      },
+      { context: { found: true } }
+    );
   } catch (error) {
-    console.error('Error fetching place:', error);
     const { message, status } = getDatabaseErrorDetails(error);
 
-    return NextResponse.json({ error: message }, { status });
+    return apiErrorResponse(requestContext, message, error, { status });
   }
 }

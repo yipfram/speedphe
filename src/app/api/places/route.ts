@@ -1,20 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getDatabaseErrorDetails, getPool } from '@/lib/db';
 import { getClientIp } from '@/lib/getClientIp';
+import {
+  apiErrorResponse,
+  apiJsonResponse,
+  createApiRequestContext,
+  runLoggedQuery,
+} from '@/lib/api-logging';
 
 export async function GET(request: NextRequest) {
-  const pool = getPool();
+  const requestContext = createApiRequestContext(request, '/api/places');
   const { searchParams } = new URL(request.url);
   const lat = searchParams.get('lat');
   const lng = searchParams.get('lng');
   const radius = searchParams.get('radius') || '5';
 
   if (!lat || !lng) {
-    return NextResponse.json({ error: 'lat and lng are required' }, { status: 400 });
+    return apiJsonResponse(requestContext, { error: 'lat and lng are required' }, { status: 400 });
   }
 
   try {
-    const result = await pool.query(
+    const pool = getPool();
+    const result = await runLoggedQuery(
+      pool,
       `SELECT
         p.id,
         p.name,
@@ -45,42 +53,54 @@ export async function GET(request: NextRequest) {
           cos(radians(lng) - radians($2)) +
           sin(radians($1)) * sin(radians(lat)))) <= $3
       ORDER BY distance_km`,
-      [parseFloat(lat), parseFloat(lng), parseFloat(radius)]
+      [parseFloat(lat), parseFloat(lng), parseFloat(radius)],
+      requestContext,
+      'places.list'
     );
 
-    return NextResponse.json({ places: result.rows || [] });
+    return apiJsonResponse(
+      requestContext,
+      { places: result.rows || [] },
+      { context: { resultCount: result.rows.length } }
+    );
   } catch (error) {
-    console.error('Error fetching places:', error);
     const { message, status } = getDatabaseErrorDetails(error);
 
-    return NextResponse.json({ error: message }, { status });
+    return apiErrorResponse(requestContext, message, error, { status });
   }
 }
 
 export async function POST(request: NextRequest) {
-  const pool = getPool();
+  const requestContext = createApiRequestContext(request, '/api/places');
 
   try {
+    const pool = getPool();
     const body = await request.json();
     const { name, lat, lng, address, google_place_id } = body;
     const clientIp = getClientIp(request);
 
     if (!name || lat === undefined || lng === undefined) {
-      return NextResponse.json({ error: 'name, lat, and lng are required' }, { status: 400 });
+      return apiJsonResponse(
+        requestContext,
+        { error: 'name, lat, and lng are required' },
+        { status: 400 }
+      );
     }
 
-    const result = await pool.query(
+    const result = await runLoggedQuery(
+      pool,
       `INSERT INTO places (name, lat, lng, address, google_place_id, client_ip)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id, name, address, lat, lng, google_place_id, created_at`,
-      [name, lat, lng, address || null, google_place_id || null, clientIp || null]
+      [name, lat, lng, address || null, google_place_id || null, clientIp || null],
+      requestContext,
+      'places.create'
     );
 
-    return NextResponse.json({ place: result.rows[0] });
+    return apiJsonResponse(requestContext, { place: result.rows[0] }, { status: 201 });
   } catch (error) {
-    console.error('Error creating place:', error);
     const { message, status } = getDatabaseErrorDetails(error);
 
-    return NextResponse.json({ error: message }, { status });
+    return apiErrorResponse(requestContext, message, error, { status });
   }
 }

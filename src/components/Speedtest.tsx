@@ -6,6 +6,7 @@ import {
 } from '@/components/speedtest/LatestSpeedtestResult';
 import { useSpeedtest } from '@/components/speedtest/useSpeedtest';
 import { Place } from '@/lib/db';
+import { createLoggedClientError, isLoggedClientError, logClientError } from '@/lib/logging';
 import { useEffect, useState } from 'react';
 
 interface SpeedtestProps {
@@ -31,19 +32,36 @@ export default function Speedtest({ place, onComplete }: SpeedtestProps) {
         const response = await fetch(`/api/places/${place.id}/speedtests?limit=1`, {
           signal: controller.signal,
         });
+        const data: { error?: string; requestId?: string; speedtests?: SavedSpeedtestResult[] } =
+          await response.json();
 
         if (!response.ok) {
-          throw new Error('Failed to load previous speedtests');
+          const errorMessage = data.error ?? 'Failed to load previous speedtests';
+
+          logClientError('client.fetch.error', {
+            action: 'speedtests.load_latest',
+            endpoint: `/api/places/${place.id}/speedtests?limit=1`,
+            status: response.status,
+            requestId: data.requestId,
+            message: errorMessage,
+          });
+          throw createLoggedClientError(errorMessage);
         }
 
-        const data: { speedtests?: SavedSpeedtestResult[] } = await response.json();
         setLastResult(data.speedtests?.[0] ?? null);
       } catch (loadError) {
         if (controller.signal.aborted) {
           return;
         }
 
-        console.error('Failed to load last speedtest:', loadError);
+        if (!isLoggedClientError(loadError)) {
+          logClientError('client.fetch.error', {
+            action: 'speedtests.load_latest',
+            endpoint: `/api/places/${place.id}/speedtests?limit=1`,
+            message:
+              loadError instanceof Error ? loadError.message : 'Failed to load previous speedtests',
+          });
+        }
         setLastResult(null);
       } finally {
         if (!controller.signal.aborted) {
