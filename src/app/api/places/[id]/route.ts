@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPool } from '@/lib/db';
+import { getDatabaseErrorDetails, getPool } from '@/lib/db';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const pool = getPool();
@@ -37,6 +37,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
   } catch (error) {
     console.error('Error fetching place:', error);
-    return NextResponse.json({ error: 'Failed to fetch place' }, { status: 500 });
+    const { message, status } = getDatabaseErrorDetails(error);
+
+    return NextResponse.json({ error: message }, { status });
   }
 }

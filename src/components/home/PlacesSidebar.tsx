@@ -7,6 +7,7 @@ interface PlacesSidebarProps {
   places: NearbyPlace[];
   selectedPlace: Place | null;
   isLoading: boolean;
+  error: string | null;
   onPlaceSelect: (place: Place) => void;
   onRefresh: () => void;
 }
@@ -37,6 +38,7 @@ export function PlacesSidebar({
   places,
   selectedPlace,
   isLoading,
+  error,
   onPlaceSelect,
   onRefresh,
 }: PlacesSidebarProps) {
@@ -71,6 +73,13 @@ export function PlacesSidebar({
           <div className="flex flex-col items-center justify-center gap-3 py-12">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#2D1B69] border-t-transparent" />
             <p className="text-sm text-[var(--text-muted)]">Finding nearby cafes...</p>
+          </div>
+        ) : error ? (
+          <div className="px-4 py-8">
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+              <p className="text-sm font-medium text-red-800">Unable to load nearby cafes</p>
+              <p className="mt-1 text-xs leading-5 text-red-700">{error}</p>
+            </div>
           </div>
         ) : places.length === 0 ? (
           <div className="px-4 py-12 text-center">

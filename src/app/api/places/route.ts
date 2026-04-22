@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPool } from '@/lib/db';
+import { getDatabaseErrorDetails, getPool } from '@/lib/db';
 import { getClientIp } from '@/lib/getClientIp';
 
 export async function GET(request: NextRequest) {
@@ -51,7 +51,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ places: result.rows || [] });
   } catch (error) {
     console.error('Error fetching places:', error);
-    return NextResponse.json({ error: 'Failed to fetch places' }, { status: 500 });
+    const { message, status } = getDatabaseErrorDetails(error);
+
+    return NextResponse.json({ error: message }, { status });
   }
 }
 
@@ -77,6 +79,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ place: result.rows[0] });
   } catch (error) {
     console.error('Error creating place:', error);
-    return NextResponse.json({ error: 'Failed to create place' }, { status: 500 });
+    const { message, status } = getDatabaseErrorDetails(error);
+
+    return NextResponse.json({ error: message }, { status });
   }
 }

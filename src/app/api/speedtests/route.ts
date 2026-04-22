@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPool } from '@/lib/db';
+import { getDatabaseErrorDetails, getPool } from '@/lib/db';
 import { getClientIp } from '@/lib/getClientIp';
 
 export async function POST(request: NextRequest) {
@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ speedtest: result.rows[0] });
   } catch (error) {
     console.error('Error creating speedtest:', error);
-    return NextResponse.json({ error: 'Failed to create speedtest' }, { status: 500 });
+    const { message, status } = getDatabaseErrorDetails(error);
+
+    return NextResponse.json({ error: message }, { status });
   }
 }

@@ -2,14 +2,93 @@ import { Pool } from 'pg';
 
 let _pool: Pool | null = null;
 
+type ErrorWithDetails = Error & {
+  cause?: unknown;
+  code?: string;
+  errors?: unknown[];
+};
+
+const CONNECTION_ERROR_CODES = new Set([
+  'EAI_AGAIN',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ENETUNREACH',
+  'ENOTFOUND',
+  'EHOSTUNREACH',
+  'ETIMEDOUT',
+]);
+
+function collectErrorCandidates(error: unknown, visited = new Set<unknown>()): ErrorWithDetails[] {
+  if (!error || visited.has(error)) {
+    return [];
+  }
+
+  visited.add(error);
+
+  if (!(error instanceof Error)) {
+    return [];
+  }
+
+  const currentError = error as ErrorWithDetails;
+  const nestedErrors = Array.isArray(currentError.errors)
+    ? currentError.errors.flatMap((nestedError) => collectErrorCandidates(nestedError, visited))
+    : [];
+
+  return [currentError, ...collectErrorCandidates(currentError.cause, visited), ...nestedErrors];
+}
+
+export function getDatabaseErrorDetails(error: unknown): { message: string; status: number } {
+  const candidates = collectErrorCandidates(error);
+  const hasDnsResolutionIssue = candidates.some(
+    (candidate) =>
+      candidate.code === 'EAI_AGAIN' || candidate.message.toLowerCase().includes('getaddrinfo')
+  );
+
+  const isConnectionIssue = candidates.some((candidate) => {
+    const message = candidate.message.toLowerCase();
+
+    return (
+      (candidate.code && CONNECTION_ERROR_CODES.has(candidate.code)) ||
+      message.includes('timeout') ||
+      message.includes('timed out') ||
+      message.includes('connect')
+    );
+  });
+
+  if (hasDnsResolutionIssue) {
+    return {
+      message:
+        'Database host could not be resolved. Check DATABASE_URL and the server DNS/network configuration.',
+      status: 503,
+    };
+  }
+
+  if (isConnectionIssue) {
+    return {
+      message:
+        'Database connection timed out. Check DATABASE_URL and that PostgreSQL is reachable.',
+      status: 503,
+    };
+  }
+
+  return {
+    message: 'Database request failed.',
+    status: 500,
+  };
+}
+
 export function getPool(): Pool {
   if (!_pool) {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
       throw new Error('Missing DATABASE_URL environment variable');
     }
+
+    const connectionTimeoutMs = Number(process.env.DB_CONNECTION_TIMEOUT_MS ?? '5000');
+
     _pool = new Pool({
       connectionString: databaseUrl,
+      connectionTimeoutMillis: Number.isFinite(connectionTimeoutMs) ? connectionTimeoutMs : 5000,
     });
   }
   return _pool;

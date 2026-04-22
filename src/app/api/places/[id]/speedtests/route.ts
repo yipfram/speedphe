@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPool } from '@/lib/db';
+import { getDatabaseErrorDetails, getPool } from '@/lib/db';
 import { getClientIp } from '@/lib/getClientIp';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -29,7 +29,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ speedtests: result.rows || [] });
   } catch (error) {
     console.error('Error fetching speedtests:', error);
-    return NextResponse.json({ error: 'Failed to fetch speedtests' }, { status: 500 });
+    const { message, status } = getDatabaseErrorDetails(error);
+
+    return NextResponse.json({ error: message }, { status });
   }
 }
 
@@ -68,6 +70,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ speedtest: result.rows[0] });
   } catch (error) {
     console.error('Error creating speedtest:', error);
-    return NextResponse.json({ error: 'Failed to create speedtest' }, { status: 500 });
+    const { message, status } = getDatabaseErrorDetails(error);
+
+    return NextResponse.json({ error: message }, { status });
   }
 }

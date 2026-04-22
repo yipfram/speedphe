@@ -32,6 +32,7 @@ export default function Home() {
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [placesError, setPlacesError] = useState<string | null>(null);
 
   const resetAddPlaceDraft = useCallback(() => {
     setAddPlaceDraft(null);
@@ -39,13 +40,20 @@ export default function Home() {
 
   const loadNearbyPlaces = useCallback(async (lat: number, lng: number) => {
     setIsLoading(true);
+    setPlacesError(null);
 
     try {
       const response = await fetch(`/api/places?lat=${lat}&lng=${lng}&radius=10`);
-      const data: { places?: NearbyPlace[] } = await response.json();
+      const data: { error?: string; places?: NearbyPlace[] } = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? 'Failed to load places');
+      }
+
       setPlaces(data.places ?? []);
     } catch (error) {
       console.error('Failed to load places:', error);
+      setPlacesError(error instanceof Error ? error.message : 'Failed to load places');
     } finally {
       setIsLoading(false);
     }
@@ -165,6 +173,7 @@ export default function Home() {
           places={places}
           selectedPlace={selectedPlace}
           isLoading={isLoading}
+          error={placesError}
           onPlaceSelect={handlePlaceSelect}
           onRefresh={handleRefreshPlaces}
         />
