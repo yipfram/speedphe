@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/lib/supabase';
+import { getPool } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
-  const supabase = getSupabase();
+  const pool = getPool();
   const { searchParams } = new URL(request.url);
   const lat = searchParams.get('lat');
   const lng = searchParams.get('lng');
@@ -13,15 +13,21 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { data, error } = await supabase.rpc('get_nearby_places', {
-      search_lat: parseFloat(lat),
-      search_lng: parseFloat(lng),
-      search_radius_km: parseFloat(radius),
-    });
+    const result = await pool.query(
+      `SELECT
+        id, name, address, lat, lng, google_place_id, created_at,
+        (6371 * acos(cos(radians($1)) * cos(radians(lat)) *
+          cos(radians(lng) - radians($2)) +
+          sin(radians($1)) * sin(radians(lat))))::FLOAT AS distance_km
+      FROM places
+      WHERE (6371 * acos(cos(radians($1)) * cos(radians(lat)) *
+          cos(radians(lng) - radians($2)) +
+          sin(radians($1)) * sin(radians(lat)))) <= $3
+      ORDER BY distance_km`,
+      [parseFloat(lat), parseFloat(lng), parseFloat(radius)]
+    );
 
-    if (error) throw error;
-
-    return NextResponse.json({ places: data || [] });
+    return NextResponse.json({ places: result.rows || [] });
   } catch (error) {
     console.error('Error fetching places:', error);
     return NextResponse.json({ error: 'Failed to fetch places' }, { status: 500 });
@@ -29,7 +35,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
+  const pool = getPool();
 
   try {
     const body = await request.json();
@@ -39,21 +45,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'name, lat, and lng are required' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from('places')
-      .insert({
-        name,
-        lat,
-        lng,
-        address: address || null,
-        google_place_id: google_place_id || null,
-      })
-      .select()
-      .single();
+    const result = await pool.query(
+      `INSERT INTO places (name, lat, lng, address, google_place_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [name, lat, lng, address || null, google_place_id || null]
+    );
 
-    if (error) throw error;
-
-    return NextResponse.json({ place: data });
+    return NextResponse.json({ place: result.rows[0] });
   } catch (error) {
     console.error('Error creating place:', error);
     return NextResponse.json({ error: 'Failed to create place' }, { status: 500 });

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabase } from '@/lib/supabase';
+import { getPool } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
+  const pool = getPool();
 
   try {
     const body = await request.json();
@@ -19,22 +19,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
-      .from('speedtests')
-      .insert({
-        place_id,
-        download_mbps,
-        upload_mbps,
-        latency_ms,
-        jitter_ms: jitter_ms || null,
-        packet_loss: packet_loss || null,
-      })
-      .select()
-      .single();
+    const result = await pool.query(
+      `INSERT INTO speedtests (place_id, download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [place_id, download_mbps, upload_mbps, latency_ms, jitter_ms || null, packet_loss || null]
+    );
 
-    if (error) throw error;
-
-    return NextResponse.json({ speedtest: data });
+    return NextResponse.json({ speedtest: result.rows[0] });
   } catch (error) {
     console.error('Error creating speedtest:', error);
     return NextResponse.json({ error: 'Failed to create speedtest' }, { status: 500 });

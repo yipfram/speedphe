@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Place } from '@/lib/supabase';
+import { Place } from '@/lib/db';
 
 interface MapProps {
   places: Place[];

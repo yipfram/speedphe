@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { Place } from '@/lib/supabase';
+import { Place } from '@/lib/db';
 import Speedtest from '@/components/Speedtest';
 
 const Map = dynamic(() => import('@/components/Map'), {
