@@ -1,7 +1,12 @@
 'use client';
 
+import {
+  LatestSpeedtestResult,
+  type SavedSpeedtestResult,
+} from '@/components/speedtest/LatestSpeedtestResult';
 import { useSpeedtest } from '@/components/speedtest/useSpeedtest';
 import { Place } from '@/lib/db';
+import { useEffect, useState } from 'react';
 
 interface SpeedtestProps {
   place: Place;
@@ -13,6 +18,46 @@ export default function Speedtest({ place, onComplete }: SpeedtestProps) {
     placeId: place.id,
     onComplete,
   });
+  const [lastResult, setLastResult] = useState<SavedSpeedtestResult | null>(null);
+  const [isLoadingLastResult, setIsLoadingLastResult] = useState(true);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadLastResult = async () => {
+      setIsLoadingLastResult(true);
+
+      try {
+        const response = await fetch(`/api/places/${place.id}/speedtests?limit=1`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load previous speedtests');
+        }
+
+        const data: { speedtests?: SavedSpeedtestResult[] } = await response.json();
+        setLastResult(data.speedtests?.[0] ?? null);
+      } catch (loadError) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        console.error('Failed to load last speedtest:', loadError);
+        setLastResult(null);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingLastResult(false);
+        }
+      }
+    };
+
+    void loadLastResult();
+
+    return () => {
+      controller.abort();
+    };
+  }, [place.id]);
 
   const renderMetricValue = (
     value: number | null,
@@ -25,14 +70,17 @@ export default function Speedtest({ place, onComplete }: SpeedtestProps) {
 
     return formatter(value);
   };
-
   return (
     <div>
       {status === 'idle' && (
         <div className="text-center py-2">
-          <p className="text-sm text-[var(--text-muted)] mb-4">
-            Measure download, upload, latency, and jitter at this location
-          </p>
+          <div className="mb-4">
+            <LatestSpeedtestResult
+              result={lastResult}
+              isLoading={isLoadingLastResult}
+              formatSpeed={formatSpeed}
+            />
+          </div>
           <button
             onClick={startTest}
             className="w-full bg-[#2D1B69] text-white px-5 py-3 rounded-xl font-semibold text-sm hover:bg-[#3d2a8a] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
