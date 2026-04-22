@@ -46,6 +46,7 @@ const getCurrentResults = (speedResults: Results): SpeedResult => ({
   jitter: speedResults.getUnloadedJitter() ?? null,
 });
 
+// TODO: Implement loss packets
 export function useSpeedtest({ placeId, onComplete }: UseSpeedtestParams) {
   const [status, setStatus] = useState<'idle' | 'running' | 'complete'>('idle');
   const [results, setResults] = useState<SpeedResult>(EMPTY_RESULTS);
