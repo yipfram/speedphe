@@ -51,6 +51,7 @@ export interface AggregatedSpeed {
 
 export interface NearbyPlace extends Place {
   distance_km: number;
+  avg_download_mbps?: number;
 }
 
 export interface PlaceSpeedStats {
