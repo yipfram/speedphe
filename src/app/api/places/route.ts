@@ -9,10 +9,7 @@ export async function GET(request: NextRequest) {
   const radius = searchParams.get('radius') || '5';
 
   if (!lat || !lng) {
-    return NextResponse.json(
-      { error: 'lat and lng are required' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'lat and lng are required' }, { status: 400 });
   }
 
   try {
@@ -27,10 +24,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ places: data || [] });
   } catch (error) {
     console.error('Error fetching places:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch places' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch places' }, { status: 500 });
   }
 }
 
@@ -42,10 +36,7 @@ export async function POST(request: NextRequest) {
     const { name, lat, lng, address, google_place_id } = body;
 
     if (!name || lat === undefined || lng === undefined) {
-      return NextResponse.json(
-        { error: 'name, lat, and lng are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'name, lat, and lng are required' }, { status: 400 });
     }
 
     const { data, error } = await supabase
@@ -65,9 +56,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ place: data });
   } catch (error) {
     console.error('Error creating place:', error);
-    return NextResponse.json(
-      { error: 'Failed to create place' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create place' }, { status: 500 });
   }
 }

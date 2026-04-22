@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = getSupabase();
   const { id } = await params;
   const { searchParams } = new URL(request.url);
@@ -23,17 +20,11 @@ export async function GET(
     return NextResponse.json({ speedtests: data || [] });
   } catch (error) {
     console.error('Error fetching speedtests:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch speedtests' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch speedtests' }, { status: 500 });
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = getSupabase();
   const { id } = await params;
 
@@ -41,11 +32,7 @@ export async function POST(
     const body = await request.json();
     const { download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss } = body;
 
-    if (
-      download_mbps === undefined ||
-      upload_mbps === undefined ||
-      latency_ms === undefined
-    ) {
+    if (download_mbps === undefined || upload_mbps === undefined || latency_ms === undefined) {
       return NextResponse.json(
         { error: 'download_mbps, upload_mbps, and latency_ms are required' },
         { status: 400 }
@@ -70,9 +57,6 @@ export async function POST(
     return NextResponse.json({ speedtest: data });
   } catch (error) {
     console.error('Error creating speedtest:', error);
-    return NextResponse.json(
-      { error: 'Failed to create speedtest' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create speedtest' }, { status: 500 });
   }
 }

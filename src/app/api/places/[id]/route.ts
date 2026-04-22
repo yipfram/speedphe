@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = getSupabase();
   const { id } = await params;
 
   try {
-    const { data: place, error } = await supabase
-      .from('places')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const { data: place, error } = await supabase.from('places').select('*').eq('id', id).single();
 
     if (error) throw error;
     if (!place) {
@@ -30,9 +23,6 @@ export async function GET(
     });
   } catch (error) {
     console.error('Error fetching place:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch place' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch place' }, { status: 500 });
   }
 }

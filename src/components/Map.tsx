@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Place, SpeedTest } from '@/lib/supabase';
+import { useEffect, useState, useCallback } from 'react';
+import { Place } from '@/lib/supabase';
 
 interface MapProps {
   places: Place[];
@@ -9,17 +9,9 @@ interface MapProps {
   onAddPlace: (lat: number, lng: number) => void;
 }
 
-function getSpeedColor(avgDownload: number | null): string {
-  if (avgDownload === null) return '#6b7280';
-  if (avgDownload > 50) return '#22c55e';
-  if (avgDownload > 25) return '#eab308';
-  if (avgDownload > 10) return '#f97316';
-  return '#ef4444';
-}
-
 export default function Map({ places, onPlaceSelect, onAddPlace }: MapProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const [L, setL] = useState<any>(null);
+  const [L, setL] = useState<typeof import('leaflet') | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -27,6 +19,9 @@ export default function Map({ places, onPlaceSelect, onAddPlace }: MapProps) {
       setL(leaflet.default);
     });
   }, []);
+
+  const stableOnPlaceSelect = useCallback(onPlaceSelect, [onPlaceSelect]);
+  const stableOnAddPlace = useCallback(onAddPlace, [onAddPlace]);
 
   useEffect(() => {
     if (!isMounted || !L) return;
@@ -57,7 +52,7 @@ export default function Map({ places, onPlaceSelect, onAddPlace }: MapProps) {
         </div>
       `);
 
-      marker.on('click', () => onPlaceSelect(place));
+      marker.on('click', () => stableOnPlaceSelect(place));
     });
 
     if (navigator.geolocation) {
@@ -71,20 +66,22 @@ export default function Map({ places, onPlaceSelect, onAddPlace }: MapProps) {
               iconSize: [16, 16],
               iconAnchor: [8, 8],
             }),
-          }).addTo(map).bindPopup('You are here');
+          })
+            .addTo(map)
+            .bindPopup('You are here');
         },
-        (err) => console.log('Geolocation error:', err)
+        () => {}
       );
     }
 
-    map.on('dblclick', (e: any) => {
-      onAddPlace(e.latlng.lat, e.latlng.lng);
+    map.on('dblclick', (e: { latlng: { lat: number; lng: number } }) => {
+      stableOnAddPlace(e.latlng.lat, e.latlng.lng);
     });
 
     return () => {
       map.remove();
     };
-  }, [isMounted, L, places]);
+  }, [isMounted, L, places, stableOnPlaceSelect, stableOnAddPlace]);
 
   if (!isMounted) {
     return (
@@ -94,7 +91,5 @@ export default function Map({ places, onPlaceSelect, onAddPlace }: MapProps) {
     );
   }
 
-  return (
-    <div id="map" className="h-full w-full" style={{ minHeight: '500px' }} />
-  );
+  return <div id="map" className="h-full w-full" style={{ minHeight: '500px' }} />;
 }

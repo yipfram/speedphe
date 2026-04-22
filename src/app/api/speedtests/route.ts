@@ -9,17 +9,10 @@ export async function POST(request: NextRequest) {
     const { place_id, download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss } = body;
 
     if (!place_id) {
-      return NextResponse.json(
-        { error: 'place_id is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'place_id is required' }, { status: 400 });
     }
 
-    if (
-      download_mbps === undefined ||
-      upload_mbps === undefined ||
-      latency_ms === undefined
-    ) {
+    if (download_mbps === undefined || upload_mbps === undefined || latency_ms === undefined) {
       return NextResponse.json(
         { error: 'download_mbps, upload_mbps, and latency_ms are required' },
         { status: 400 }
@@ -44,9 +37,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ speedtest: data });
   } catch (error) {
     console.error('Error creating speedtest:', error);
-    return NextResponse.json(
-      { error: 'Failed to create speedtest' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create speedtest' }, { status: 500 });
   }
 }

@@ -10,6 +10,31 @@ export interface GooglePlace {
   user_ratings_total?: number;
 }
 
+interface GooglePlaceResponse {
+  place_id: string;
+  name: string;
+  vicinity?: string;
+  formatted_address?: string;
+  geometry: {
+    location: {
+      lat: number;
+      lng: number;
+    };
+  };
+  rating?: number;
+  user_ratings_total?: number;
+}
+
+interface GooglePlacesSearchResult {
+  status: string;
+  results: GooglePlaceResponse[];
+}
+
+interface GooglePlaceDetailsResult {
+  status: string;
+  result: GooglePlaceResponse;
+}
+
 export async function searchNearbyCoffeeShops(
   lat: number,
   lng: number,
@@ -19,13 +44,13 @@ export async function searchNearbyCoffeeShops(
     `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=cafe&key=${GOOGLE_PLACES_API_KEY}`
   );
 
-  const data = await response.json();
+  const data = (await response.json()) as GooglePlacesSearchResult;
 
   if (data.status !== 'OK') {
     throw new Error(`Google Places API error: ${data.status}`);
   }
 
-  return data.results.map((place: any) => ({
+  return data.results.map((place) => ({
     place_id: place.place_id,
     name: place.name,
     address: place.vicinity || '',
@@ -41,7 +66,7 @@ export async function getPlaceDetails(placeId: string): Promise<GooglePlace> {
     `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,geometry,rating,user_ratings_total&key=${GOOGLE_PLACES_API_KEY}`
   );
 
-  const data = await response.json();
+  const data = (await response.json()) as GooglePlaceDetailsResult;
 
   if (data.status !== 'OK') {
     throw new Error(`Google Places API error: ${data.status}`);

@@ -117,9 +117,7 @@ export default function Home() {
                 }`}
               >
                 <h3 className="font-medium text-gray-900">{place.name}</h3>
-                {place.address && (
-                  <p className="text-sm text-gray-500 mt-1">{place.address}</p>
-                )}
+                {place.address && <p className="text-sm text-gray-500 mt-1">{place.address}</p>}
               </div>
             ))
           )}
@@ -128,11 +126,7 @@ export default function Home() {
 
       <div className="flex-1 relative">
         {userLocation && (
-          <Map
-            places={places}
-            onPlaceSelect={setSelectedPlace}
-            onAddPlace={handleAddPlace}
-          />
+          <Map places={places} onPlaceSelect={setSelectedPlace} onAddPlace={handleAddPlace} />
         )}
 
         {selectedPlace && (
@@ -149,11 +143,14 @@ export default function Home() {
             {selectedPlace.address && (
               <p className="text-sm text-gray-600 mb-4">{selectedPlace.address}</p>
             )}
-            <Speedtest place={selectedPlace} onComplete={() => {
-              if (userLocation) {
-                loadNearbyPlaces(userLocation.lat, userLocation.lng);
-              }
-            }} />
+            <Speedtest
+              place={selectedPlace}
+              onComplete={() => {
+                if (userLocation) {
+                  loadNearbyPlaces(userLocation.lat, userLocation.lng);
+                }
+              }}
+            />
           </div>
         )}
 

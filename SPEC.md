@@ -31,16 +31,16 @@
 
 ## Technology Stack
 
-| Component | Technology |
-|-----------|------------|
-| Framework | Next.js 14 (App Router) |
-| Language | TypeScript |
-| Map | Leaflet + OpenStreetMap (free) |
-| Speedtest | @cloudflare/speedtest SDK |
-| Database | PostgreSQL (Supabase or Neon) |
-| Places | Google Places API |
-| Auth | Supabase Auth (optional, v1) |
-| Styling | Tailwind CSS |
+| Component | Technology                     |
+| --------- | ------------------------------ |
+| Framework | Next.js 14 (App Router)        |
+| Language  | TypeScript                     |
+| Map       | Leaflet + OpenStreetMap (free) |
+| Speedtest | @cloudflare/speedtest SDK      |
+| Database  | PostgreSQL (Supabase or Neon)  |
+| Places    | Google Places API              |
+| Auth      | Supabase Auth (optional, v1)   |
+| Styling   | Tailwind CSS                   |
 
 ## Features
 
@@ -177,15 +177,15 @@ users {
 
 ### Color Palette
 
-| Role | Color |
-|------|-------|
-| Primary | `#2D1B69` (Deep purple) |
-| Secondary | `#FF6B35` (Warm orange) |
-| Background | `#FAFAFA` |
-| Text | `#1A1A1A` |
-| Success | `#22C55E` |
-| Warning | `#EAB308` |
-| Error | `#EF4444` |
+| Role       | Color                   |
+| ---------- | ----------------------- |
+| Primary    | `#2D1B69` (Deep purple) |
+| Secondary  | `#FF6B35` (Warm orange) |
+| Background | `#FAFAFA`               |
+| Text       | `#1A1A1A`               |
+| Success    | `#22C55E`               |
+| Warning    | `#EAB308`               |
+| Error      | `#EF4444`               |
 
 ### Typography
 
@@ -200,23 +200,27 @@ The Cloudflare Speedtest SDK collects measurement results on completion for aggr
 ## Development Phases
 
 ### Phase 1: Setup
+
 - [ ] Initialize Next.js project
 - [ ] Set up database (Supabase/Neon)
 - [ ] Configure Tailwind CSS
 - [ ] Install Leaflet + React-Leaflet
 
 ### Phase 2: Map & Places
+
 - [ ] Implement map with OpenStreetMap
 - [ ] Add Google Places API integration
 - [ ] Create place markers
 - [ ] Implement place detail view
 
 ### Phase 3: Speedtest
+
 - [ ] Integrate Cloudflare Speedtest SDK
 - [ ] Create speedtest modal/flow
 - [ ] Connect to API endpoints
 
 ### Phase 4: Data & Polish
+
 - [ ] Speed test submission to DB
 - [ ] Speed aggregation/display
 - [ ] Optional auth
