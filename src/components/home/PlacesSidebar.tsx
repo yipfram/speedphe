@@ -16,8 +16,8 @@ interface SpeedBadge {
   label: string;
 }
 
-function getSpeedBadge(speed?: number): SpeedBadge {
-  if (!speed) {
+function getSpeedBadge(speed: number | null | undefined): SpeedBadge {
+  if (speed == null) {
     return { color: 'bg-gray-100 text-gray-500', label: 'No data' };
   }
   if (speed > 50) {

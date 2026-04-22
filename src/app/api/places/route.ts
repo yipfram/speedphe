@@ -15,11 +15,31 @@ export async function GET(request: NextRequest) {
   try {
     const result = await pool.query(
       `SELECT
-        id, name, address, lat, lng, google_place_id, created_at,
+        p.id,
+        p.name,
+        p.address,
+        p.lat,
+        p.lng,
+        p.google_place_id,
+        p.created_at,
+        stats.avg_download_mbps,
+        stats.avg_upload_mbps,
+        stats.avg_latency_ms,
+        stats.test_count,
         (6371 * acos(cos(radians($1)) * cos(radians(lat)) *
           cos(radians(lng) - radians($2)) +
           sin(radians($1)) * sin(radians(lat))))::FLOAT AS distance_km
-      FROM places
+      FROM places p
+      LEFT JOIN (
+        SELECT
+          place_id,
+          AVG(download_mbps)::FLOAT AS avg_download_mbps,
+          AVG(upload_mbps)::FLOAT AS avg_upload_mbps,
+          AVG(latency_ms)::FLOAT AS avg_latency_ms,
+          COUNT(*)::INTEGER AS test_count
+        FROM speedtests
+        GROUP BY place_id
+      ) stats ON stats.place_id = p.id
       WHERE (6371 * acos(cos(radians($1)) * cos(radians(lat)) *
           cos(radians(lng) - radians($2)) +
           sin(radians($1)) * sin(radians(lat)))) <= $3

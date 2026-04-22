@@ -134,6 +134,7 @@ export default function Home() {
       const createdPlace: NearbyPlace = {
         ...data.place,
         distance_km: 0,
+        avg_download_mbps: null,
       };
 
       setPlaces((currentPlaces) => [...currentPlaces, createdPlace]);

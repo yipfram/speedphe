@@ -57,7 +57,7 @@ export default function Map({ places, userLocation, onPlaceSelect, onAddPlace }:
     // Speed-based color function
     const getSpeedColor = (place: NearbyPlace) => {
       const speed = place.avg_download_mbps;
-      if (!speed) return '#6b7280'; // gray - no data
+      if (speed == null) return '#6b7280'; // gray - no data
       if (speed > 50) return '#22C55E'; // green
       if (speed > 25) return '#EAB308'; // yellow
       if (speed > 10) return '#FF6B35'; // orange
@@ -66,7 +66,7 @@ export default function Map({ places, userLocation, onPlaceSelect, onAddPlace }:
 
     const getSpeedLabel = (place: NearbyPlace) => {
       const speed = place.avg_download_mbps;
-      if (!speed) return 'No data';
+      if (speed == null) return 'No data';
       return `${speed.toFixed(0)} Mbps`;
     };
 
