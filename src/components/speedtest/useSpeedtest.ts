@@ -21,18 +21,15 @@ type SpeedTestConfig = NonNullable<ConstructorParameters<typeof SpeedTest>[0]>;
 const SPEEDTEST_MEASUREMENTS: SpeedTestConfig['measurements'] = [
   { type: 'latency', numPackets: 1 },
   { type: 'download', bytes: 1e5, count: 1, bypassMinDuration: true },
-  { type: 'latency', numPackets: 20 },
-  { type: 'download', bytes: 1e5, count: 9 },
-  { type: 'download', bytes: 1e6, count: 8 },
-  { type: 'upload', bytes: 1e5, count: 8 },
-  { type: 'upload', bytes: 1e6, count: 6 },
-  { type: 'download', bytes: 1e7, count: 6 },
-  { type: 'upload', bytes: 1e7, count: 4 },
-  { type: 'download', bytes: 2.5e7, count: 4 },
-  { type: 'upload', bytes: 2.5e7, count: 4 },
-  { type: 'download', bytes: 1e8, count: 3 },
-  { type: 'upload', bytes: 5e7, count: 3 },
-  { type: 'download', bytes: 2.5e8, count: 2 },
+  { type: 'latency', numPackets: 10 },
+  { type: 'download', bytes: 1e5, count: 5 },
+  { type: 'download', bytes: 1e6, count: 4 },
+  { type: 'upload', bytes: 1e5, count: 4 },
+  { type: 'upload', bytes: 1e6, count: 4 },
+  { type: 'download', bytes: 1e7, count: 3 },
+  { type: 'upload', bytes: 1e7, count: 3 },
+  { type: 'download', bytes: 2.5e7, count: 2 },
+  { type: 'upload', bytes: 2.5e7, count: 2 },
 ];
 
 const EMPTY_RESULTS: SpeedResult = {
