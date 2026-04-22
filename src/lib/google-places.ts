@@ -1,4 +1,5 @@
-const GOOGLE_PLACES_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+const GOOGLE_PLACES_API_KEY =
+  process.env.GOOGLE_PLACES_API_KEY ?? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 export interface GooglePlace {
   place_id: string;
@@ -10,29 +11,77 @@ export interface GooglePlace {
   user_ratings_total?: number;
 }
 
+interface GooglePlaceLocation {
+  latitude: number;
+  longitude: number;
+}
+
 interface GooglePlaceResponse {
-  place_id: string;
-  name: string;
-  vicinity?: string;
-  formatted_address?: string;
-  geometry: {
-    location: {
-      lat: number;
-      lng: number;
-    };
+  id: string;
+  displayName?: {
+    text: string;
   };
+  formattedAddress?: string;
+  location?: GooglePlaceLocation;
   rating?: number;
-  user_ratings_total?: number;
+  userRatingCount?: number;
 }
 
 interface GooglePlacesSearchResult {
-  status: string;
-  results: GooglePlaceResponse[];
+  places?: GooglePlaceResponse[];
 }
 
 interface GooglePlaceDetailsResult {
-  status: string;
-  result: GooglePlaceResponse;
+  error?: {
+    code?: number;
+    message?: string;
+    status?: string;
+  };
+  id?: string;
+  displayName?: {
+    text: string;
+  };
+  formattedAddress?: string;
+  location?: GooglePlaceLocation;
+  rating?: number;
+  userRatingCount?: number;
+}
+
+interface GooglePlacesApiError {
+  error?: {
+    code?: number;
+    message?: string;
+    status?: string;
+  };
+}
+
+function getApiKey(): string {
+  if (!GOOGLE_PLACES_API_KEY) {
+    throw new Error('Missing GOOGLE_PLACES_API_KEY environment variable');
+  }
+
+  return GOOGLE_PLACES_API_KEY;
+}
+
+function getGoogleApiErrorMessage(data: GooglePlacesApiError, fallbackStatus: string) {
+  const status = data.error?.status ?? fallbackStatus;
+  const message = data.error?.message;
+
+  return message
+    ? `Google Places API error: ${status} - ${message}`
+    : `Google Places API error: ${status}`;
+}
+
+function mapGooglePlace(place: GooglePlaceResponse): GooglePlace {
+  return {
+    place_id: place.id,
+    name: place.displayName?.text ?? 'Unknown place',
+    address: place.formattedAddress ?? '',
+    lat: place.location?.latitude ?? 0,
+    lng: place.location?.longitude ?? 0,
+    rating: place.rating,
+    user_ratings_total: place.userRatingCount,
+  };
 }
 
 export async function searchNearbyCoffeeShops(
@@ -40,46 +89,71 @@ export async function searchNearbyCoffeeShops(
   lng: number,
   radius: number = 5000
 ): Promise<GooglePlace[]> {
-  const response = await fetch(
-    `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=cafe&key=${GOOGLE_PLACES_API_KEY}`
-  );
+  const apiKey = getApiKey();
+
+  const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask':
+        'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount',
+    },
+    body: JSON.stringify({
+      includedTypes: ['cafe'],
+      maxResultCount: 20,
+      locationRestriction: {
+        circle: {
+          center: {
+            latitude: lat,
+            longitude: lng,
+          },
+          radius,
+        },
+      },
+      rankPreference: 'DISTANCE',
+    }),
+  });
 
   const data = (await response.json()) as GooglePlacesSearchResult;
 
-  if (data.status !== 'OK') {
-    throw new Error(`Google Places API error: ${data.status}`);
+  if (!response.ok) {
+    throw new Error(getGoogleApiErrorMessage(data as GooglePlacesApiError, response.statusText));
   }
 
-  return data.results.map((place) => ({
-    place_id: place.place_id,
-    name: place.name,
-    address: place.vicinity || '',
-    lat: place.geometry.location.lat,
-    lng: place.geometry.location.lng,
-    rating: place.rating,
-    user_ratings_total: place.user_ratings_total,
-  }));
+  if (!data.places || data.places.length === 0) {
+    return [];
+  }
+
+  return data.places.filter((place) => place.id && place.location).map(mapGooglePlace);
 }
 
 export async function getPlaceDetails(placeId: string): Promise<GooglePlace> {
-  const response = await fetch(
-    `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,geometry,rating,user_ratings_total&key=${GOOGLE_PLACES_API_KEY}`
-  );
+  const apiKey = getApiKey();
+
+  const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
+    headers: {
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'id,displayName,formattedAddress,location,rating,userRatingCount',
+    },
+  });
 
   const data = (await response.json()) as GooglePlaceDetailsResult;
 
-  if (data.status !== 'OK') {
-    throw new Error(`Google Places API error: ${data.status}`);
+  if (!response.ok) {
+    throw new Error(getGoogleApiErrorMessage(data, response.statusText));
   }
 
-  const place = data.result;
-  return {
-    place_id: place.place_id,
-    name: place.name,
-    address: place.formatted_address || '',
-    lat: place.geometry.location.lat,
-    lng: place.geometry.location.lng,
-    rating: place.rating,
-    user_ratings_total: place.user_ratings_total,
-  };
+  if (!data.id || !data.location) {
+    throw new Error('Google Places API error: NOT_FOUND');
+  }
+
+  return mapGooglePlace({
+    id: data.id,
+    displayName: data.displayName,
+    formattedAddress: data.formattedAddress,
+    location: data.location,
+    rating: data.rating,
+    userRatingCount: data.userRatingCount,
+  });
 }

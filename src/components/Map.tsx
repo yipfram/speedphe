@@ -2,19 +2,31 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { MapLoadingFallback } from '@/components/home/MapLoadingFallback';
-import { Place, NearbyPlace } from '@/lib/db';
+import { type DiscoverablePlace } from '@/lib/db';
 
 interface MapProps {
-  places: NearbyPlace[];
+  places: DiscoverablePlace[];
   userLocation?: { lat: number; lng: number } | null;
-  onPlaceSelect: (place: Place) => void;
-  onAddPlace: (lat: number, lng: number) => void;
+  onPlaceSelect: (place: DiscoverablePlace) => void;
+  onViewportChange: (viewport: {
+    lat: number;
+    lng: number;
+    radiusKm: number;
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  }) => void;
 }
 
-export default function Map({ places, userLocation, onPlaceSelect, onAddPlace }: MapProps) {
+export default function Map({ places, userLocation, onPlaceSelect, onViewportChange }: MapProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [L, setL] = useState<typeof import('leaflet') | null>(null);
   const mapRef = useRef<ReturnType<typeof import('leaflet').map> | null>(null);
+  const markerLayerRef = useRef<ReturnType<typeof import('leaflet').layerGroup> | null>(null);
+  const userMarkerRef = useRef<ReturnType<typeof import('leaflet').marker> | null>(null);
+  const hasCenteredOnUserRef = useRef(false);
+  const viewportTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,46 +37,111 @@ export default function Map({ places, userLocation, onPlaceSelect, onAddPlace }:
   }, []);
 
   const stableOnPlaceSelect = useCallback(onPlaceSelect, [onPlaceSelect]);
-  const stableOnAddPlace = useCallback(onAddPlace, [onAddPlace]);
+  const stableOnViewportChange = useCallback(onViewportChange, [onViewportChange]);
 
   useEffect(() => {
-    if (!isMounted || !L || !containerRef.current) return;
+    return () => {
+      if (viewportTimeoutRef.current) {
+        clearTimeout(viewportTimeoutRef.current);
+      }
+    };
+  }, []);
 
-    // Clean up previous map instance
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-    }
+  useEffect(() => {
+    if (!isMounted || !L || !containerRef.current || mapRef.current) return;
 
-    const center: [number, number] = userLocation
+    const defaultCenter: [number, number] = userLocation
       ? [userLocation.lat, userLocation.lng]
       : [48.8566, 2.3522];
-
     const map = L.map(containerRef.current, {
       zoomControl: true,
       attributionControl: true,
-    }).setView(center, 14);
+    }).setView(defaultCenter, 14);
 
     mapRef.current = map;
+    markerLayerRef.current = L.layerGroup().addTo(map);
 
-    // Use a cleaner tile style (CartoDB Voyager)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
       maxZoom: 19,
     }).addTo(map);
 
-    // Speed-based color function
-    const getSpeedColor = (place: NearbyPlace) => {
-      const speed = place.avg_download_mbps;
-      if (speed == null) return '#6b7280'; // gray - no data
-      if (speed > 50) return '#22C55E'; // green
-      if (speed > 25) return '#EAB308'; // yellow
-      if (speed > 10) return '#FF6B35'; // orange
-      return '#EF4444'; // red
+    const emitViewportChange = () => {
+      const center = map.getCenter();
+      const bounds = map.getBounds();
+      const radiusMeters = center.distanceTo(bounds.getNorthEast());
+
+      stableOnViewportChange({
+        lat: center.lat,
+        lng: center.lng,
+        radiusKm: Math.max(1, Math.min(25, radiusMeters / 1000)),
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest(),
+      });
     };
 
-    const getSpeedLabel = (place: NearbyPlace) => {
+    const handleViewportChange = () => {
+      if (viewportTimeoutRef.current) {
+        clearTimeout(viewportTimeoutRef.current);
+      }
+
+      viewportTimeoutRef.current = setTimeout(emitViewportChange, 250);
+    };
+
+    map.on('moveend', handleViewportChange);
+    map.on('zoomend', handleViewportChange);
+
+    setTimeout(() => {
+      map.invalidateSize();
+      emitViewportChange();
+    }, 100);
+
+    return () => {
+      map.off('moveend', handleViewportChange);
+      map.off('zoomend', handleViewportChange);
+      if (viewportTimeoutRef.current) {
+        clearTimeout(viewportTimeoutRef.current);
+      }
+      map.remove();
+      mapRef.current = null;
+      markerLayerRef.current = null;
+      userMarkerRef.current = null;
+    };
+  }, [isMounted, L, userLocation, stableOnViewportChange]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !userLocation || hasCenteredOnUserRef.current) {
+      return;
+    }
+
+    map.setView([userLocation.lat, userLocation.lng], 14);
+    hasCenteredOnUserRef.current = true;
+  }, [userLocation]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !L || !markerLayerRef.current) {
+      return;
+    }
+
+    const getSpeedColor = (place: DiscoverablePlace) => {
+      if (!place.isSpeedtested) return '#94A3B8';
+      const speed = place.avg_download_mbps;
+      if (speed == null) return '#6b7280';
+      if (speed > 50) return '#22C55E';
+      if (speed > 25) return '#EAB308';
+      if (speed > 10) return '#FF6B35';
+      return '#EF4444';
+    };
+
+    const getSpeedLabel = (place: DiscoverablePlace) => {
+      if (!place.isSpeedtested) return 'Not tested';
       const speed = place.avg_download_mbps;
       if (speed == null) return 'No data';
       return `${speed.toFixed(0)} Mbps`;
@@ -106,13 +183,14 @@ export default function Map({ places, userLocation, onPlaceSelect, onAddPlace }:
         popupAnchor: [0, -16],
       });
 
-    // Place markers
+    markerLayerRef.current.clearLayers();
+
     places.forEach((place) => {
       const color = getSpeedColor(place);
       const speedLabel = getSpeedLabel(place);
       const marker = L.marker([place.lat, place.lng], {
         icon: customIcon(color),
-      }).addTo(map);
+      });
 
       marker.bindPopup(`
         <div style="min-width: 180px; padding: 4px 0;">
@@ -120,6 +198,9 @@ export default function Map({ places, userLocation, onPlaceSelect, onAddPlace }:
             ${place.name}
           </div>
           ${place.address ? `<div style="color: #6b7280; font-size: 13px; margin-bottom: 6px;">${place.address}</div>` : ''}
+          <div style="color: #475569; font-size: 12px; margin-bottom: 6px; font-weight: 600;">
+            ${place.isSpeedtested ? 'Speedtested cafe' : 'Available for first speedtest'}
+          </div>
           <div style="
             display: inline-block;
             padding: 2px 8px;
@@ -133,54 +214,50 @@ export default function Map({ places, userLocation, onPlaceSelect, onAddPlace }:
       `);
 
       marker.on('click', () => stableOnPlaceSelect(place));
+      markerLayerRef.current?.addLayer(marker);
     });
+  }, [L, places, stableOnPlaceSelect]);
 
-    // User location marker
-    if (userLocation) {
-      L.marker([userLocation.lat, userLocation.lng], {
-        icon: L.divIcon({
-          className: 'user-marker',
-          html: `
-            <div style="position: relative; width: 20px; height: 20px;">
-              <div class="user-pulse-ring" style="
-                position: absolute;
-                inset: -6px;
-                border-radius: 50%;
-                background: rgba(45, 27, 105, 0.15);
-              "></div>
-              <div style="
-                position: absolute;
-                inset: 0;
-                background: #2D1B69;
-                border-radius: 50%;
-                border: 3px solid white;
-                box-shadow: 0 2px 8px rgba(45, 27, 105, 0.4);
-              "></div>
-            </div>
-          `,
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
-        }),
-      })
-        .addTo(map)
-        .bindPopup('<div style="font-weight: 500;">Your location</div>');
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !L || !userLocation) {
+      return;
     }
 
-    // Double-click to add place
-    map.on('dblclick', (e: { latlng: { lat: number; lng: number } }) => {
-      stableOnAddPlace(e.latlng.lat, e.latlng.lng);
-    });
+    if (userMarkerRef.current) {
+      userMarkerRef.current.remove();
+      userMarkerRef.current = null;
+    }
 
-    // Invalidate size after mount to ensure proper rendering
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 100);
-
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
-  }, [isMounted, L, places, userLocation, stableOnPlaceSelect, stableOnAddPlace]);
+    userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], {
+      icon: L.divIcon({
+        className: 'user-marker',
+        html: `
+          <div style="position: relative; width: 20px; height: 20px;">
+            <div class="user-pulse-ring" style="
+              position: absolute;
+              inset: -6px;
+              border-radius: 50%;
+              background: rgba(45, 27, 105, 0.15);
+            "></div>
+            <div style="
+              position: absolute;
+              inset: 0;
+              background: #2D1B69;
+              border-radius: 50%;
+              border: 3px solid white;
+              box-shadow: 0 2px 8px rgba(45, 27, 105, 0.4);
+            "></div>
+          </div>
+        `,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+      }),
+    })
+      .addTo(map)
+      .bindPopup('<div style="font-weight: 500;">Your location</div>');
+  }, [L, userLocation]);
 
   if (!isMounted) {
     return <MapLoadingFallback />;

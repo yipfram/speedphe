@@ -6,7 +6,7 @@ import { createLoggedClientError, isLoggedClientError, logClientError } from '@/
 import { useEffect, useRef, useState } from 'react';
 
 interface UseSpeedtestParams {
-  placeId: string;
+  ensurePlaceId: () => Promise<string>;
   onComplete: () => void;
 }
 
@@ -48,7 +48,7 @@ const getCurrentResults = (speedResults: Results): SpeedResult => ({
 });
 
 // TODO: Implement loss packets
-export function useSpeedtest({ placeId, onComplete }: UseSpeedtestParams) {
+export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) {
   const [status, setStatus] = useState<'idle' | 'running' | 'complete'>('idle');
   const [results, setResults] = useState<SpeedResult>(EMPTY_RESULTS);
   const [progress, setProgress] = useState(0);
@@ -66,7 +66,7 @@ export function useSpeedtest({ placeId, onComplete }: UseSpeedtestParams) {
     return `${mbps.toFixed(1)} Mbps`;
   };
 
-  const saveResults = async (result: SpeedResult) => {
+  const saveResults = async (placeId: string, result: SpeedResult) => {
     const response = await fetch('/api/speedtests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -102,6 +102,7 @@ export function useSpeedtest({ placeId, onComplete }: UseSpeedtestParams) {
     setResults(EMPTY_RESULTS);
 
     try {
+      const placeId = await ensurePlaceId();
       const speedTestOptions = {
         autoStart: false,
         measurements: SPEEDTEST_MEASUREMENTS,
@@ -144,7 +145,7 @@ export function useSpeedtest({ placeId, onComplete }: UseSpeedtestParams) {
         setProgress(100);
 
         try {
-          await saveResults({
+          await saveResults(placeId, {
             download: result.download ?? 0,
             upload: result.upload ?? 0,
             latency: result.latency ?? 0,

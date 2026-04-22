@@ -1,14 +1,14 @@
 'use client';
 
 import { CafeIcon, RefreshIcon } from '@/components/Icons';
-import type { NearbyPlace, Place } from '@/lib/db';
+import type { DiscoverablePlace } from '@/lib/db';
 
 interface PlacesSidebarProps {
-  places: NearbyPlace[];
-  selectedPlace: Place | null;
+  places: DiscoverablePlace[];
+  selectedPlace: DiscoverablePlace | null;
   isLoading: boolean;
   error: string | null;
-  onPlaceSelect: (place: Place) => void;
+  onPlaceSelect: (place: DiscoverablePlace) => void;
   onRefresh: () => void;
 }
 
@@ -17,7 +17,12 @@ interface SpeedBadge {
   label: string;
 }
 
-function getSpeedBadge(speed: number | null | undefined): SpeedBadge {
+function getSpeedBadge(place: DiscoverablePlace): SpeedBadge {
+  if (!place.isSpeedtested) {
+    return { color: 'bg-slate-100 text-slate-600', label: 'Not tested yet' };
+  }
+
+  const speed = place.avg_download_mbps;
   if (speed == null) {
     return { color: 'bg-gray-100 text-gray-500', label: 'No data' };
   }
@@ -87,32 +92,54 @@ export function PlacesSidebar({
               <CafeIcon className="text-gray-400" strokeWidth={1.5} width={24} height={24} />
             </div>
             <p className="mb-1 text-sm font-medium text-gray-700">No cafes found nearby</p>
-            <p className="text-xs text-[var(--text-muted)]">
-              Double-click on the map to add a coffee shop
-            </p>
+            <p className="text-xs text-[var(--text-muted)]">Try refreshing your nearby search</p>
           </div>
         ) : (
           <div className="space-y-1.5">
             {places.map((place) => {
-              const badge = getSpeedBadge(place.avg_download_mbps);
+              const badge = getSpeedBadge(place);
 
               return (
                 <button
-                  key={place.id}
+                  key={place.google_place_id}
                   onClick={() => onPlaceSelect(place)}
                   className={[
                     'w-full rounded-xl p-3.5 text-left transition-all duration-150',
-                    selectedPlace?.id === place.id
+                    selectedPlace?.google_place_id === place.google_place_id
                       ? 'bg-[var(--primary-lighter)] ring-1 ring-[#2D1B69]/20'
-                      : 'hover:bg-gray-50 active:bg-gray-100',
+                      : place.isSpeedtested
+                        ? 'hover:bg-orange-50 active:bg-orange-100'
+                        : 'hover:bg-gray-50 active:bg-gray-100',
                   ].join(' ')}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-sm font-semibold text-gray-900">{place.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate text-sm font-semibold text-gray-900">
+                          {place.name}
+                        </h3>
+                        <span
+                          className={[
+                            'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                            place.isSpeedtested
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-slate-100 text-slate-600',
+                          ].join(' ')}
+                        >
+                          {place.isSpeedtested ? 'Tested' : 'New'}
+                        </span>
+                      </div>
                       {place.address && (
                         <p className="mt-0.5 truncate text-xs text-[var(--text-muted)]">
                           {place.address}
+                        </p>
+                      )}
+                      {!place.isSpeedtested && place.rating !== undefined && (
+                        <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                          {place.rating.toFixed(1)} rating
+                          {place.user_ratings_total
+                            ? ` · ${place.user_ratings_total} Google reviews`
+                            : ''}
                         </p>
                       )}
                     </div>
@@ -131,7 +158,7 @@ export function PlacesSidebar({
 
       <div className="border-t border-[var(--border)] px-5 py-3">
         <p className="text-center text-[11px] text-[var(--text-muted)]">
-          Double-click the map to add a new cafe
+          Tested cafes stay pinned at the top of your nearby results
         </p>
       </div>
     </div>

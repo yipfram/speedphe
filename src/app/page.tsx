@@ -4,10 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { MenuIcon } from '@/components/Icons';
 import { MapLoadingFallback } from '@/components/home/MapLoadingFallback';
-import { AddPlacePanel } from '@/components/home/AddPlacePanel';
 import { PlaceDetailsPanel } from '@/components/home/PlaceDetailsPanel';
 import { PlacesSidebar } from '@/components/home/PlacesSidebar';
-import type { NearbyPlace, Place } from '@/lib/db';
+import type { DiscoverablePlace } from '@/lib/db';
 import { createLoggedClientError, isLoggedClientError, logClientError } from '@/lib/logging';
 
 const DEFAULT_LOCATION = { lat: 48.8566, lng: 2.3522 };
@@ -17,69 +16,101 @@ interface Coordinates {
   lng: number;
 }
 
-interface AddPlaceDraft extends Coordinates {
-  name: string;
-}
-
 const Map = dynamic(() => import('@/components/Map'), {
   ssr: false,
   loading: () => <MapLoadingFallback />,
 });
 
 export default function Home() {
-  const [places, setPlaces] = useState<NearbyPlace[]>([]);
-  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
-  const [addPlaceDraft, setAddPlaceDraft] = useState<AddPlaceDraft | null>(null);
+  const [places, setPlaces] = useState<DiscoverablePlace[]>([]);
+  const [selectedPlace, setSelectedPlace] = useState<DiscoverablePlace | null>(null);
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const [mapViewport, setMapViewport] = useState<{
+    lat: number;
+    lng: number;
+    radiusKm: number;
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [placesError, setPlacesError] = useState<string | null>(null);
 
-  const resetAddPlaceDraft = useCallback(() => {
-    setAddPlaceDraft(null);
-  }, []);
+  const loadViewportPlaces = useCallback(
+    async (viewport: {
+      lat: number;
+      lng: number;
+      radiusKm: number;
+      north: number;
+      south: number;
+      east: number;
+      west: number;
+    }) => {
+      setIsLoading(true);
+      setPlacesError(null);
 
-  const loadNearbyPlaces = useCallback(async (lat: number, lng: number) => {
-    setIsLoading(true);
-    setPlacesError(null);
-
-    try {
-      const response = await fetch(`/api/places?lat=${lat}&lng=${lng}&radius=10`);
-      const data: { error?: string; places?: NearbyPlace[]; requestId?: string } =
-        await response.json();
-
-      if (!response.ok) {
-        const errorMessage = data.error ?? 'Failed to load places';
-
-        logClientError('client.fetch.error', {
-          action: 'places.load_nearby',
-          endpoint: '/api/places',
-          status: response.status,
-          requestId: data.requestId,
-          message: errorMessage,
+      try {
+        const params = new URLSearchParams({
+          lat: String(viewport.lat),
+          lng: String(viewport.lng),
+          radius: String(viewport.radiusKm),
+          north: String(viewport.north),
+          south: String(viewport.south),
+          east: String(viewport.east),
+          west: String(viewport.west),
         });
-        throw createLoggedClientError(errorMessage);
-      }
+        const response = await fetch(`/api/places?${params.toString()}`);
+        const data: { error?: string; places?: DiscoverablePlace[]; requestId?: string } =
+          await response.json();
 
-      setPlaces(data.places ?? []);
-    } catch (error) {
-      if (!isLoggedClientError(error)) {
-        logClientError('client.fetch.error', {
-          action: 'places.load_nearby',
-          endpoint: '/api/places',
-          message: error instanceof Error ? error.message : 'Failed to load places',
+        if (!response.ok) {
+          const errorMessage = data.error ?? 'Failed to load places';
+
+          logClientError('client.fetch.error', {
+            action: 'places.load_nearby',
+            endpoint: '/api/places',
+            status: response.status,
+            requestId: data.requestId,
+            message: errorMessage,
+          });
+          throw createLoggedClientError(errorMessage);
+        }
+
+        const nextPlaces = data.places ?? [];
+
+        setPlaces(nextPlaces);
+        setSelectedPlace((currentSelectedPlace) => {
+          if (!currentSelectedPlace) {
+            return currentSelectedPlace;
+          }
+
+          return (
+            nextPlaces.find(
+              (place) => place.google_place_id === currentSelectedPlace.google_place_id
+            ) ?? currentSelectedPlace
+          );
         });
+      } catch (error) {
+        if (!isLoggedClientError(error)) {
+          logClientError('client.fetch.error', {
+            action: 'places.load_viewport',
+            endpoint: '/api/places',
+            message: error instanceof Error ? error.message : 'Failed to load places',
+          });
+        }
+        setPlacesError(error instanceof Error ? error.message : 'Failed to load places');
+      } finally {
+        setIsLoading(false);
       }
-      setPlacesError(error instanceof Error ? error.message : 'Failed to load places');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     const initializeLocation = (location: Coordinates) => {
       setUserLocation(location);
-      void loadNearbyPlaces(location.lat, location.lng);
     };
 
     if (!navigator.geolocation) {
@@ -104,105 +135,101 @@ export default function Home() {
         initializeLocation(DEFAULT_LOCATION);
       }
     );
-  }, [loadNearbyPlaces]);
-
-  const handleAddPlace = useCallback((lat: number, lng: number) => {
-    setAddPlaceDraft({ lat, lng, name: '' });
-    setSelectedPlace(null);
   }, []);
 
   const handleCloseSelectedPlace = useCallback(() => {
     setSelectedPlace(null);
   }, []);
 
-  const handlePlaceSelect = useCallback(
-    (place: Place) => {
-      setSelectedPlace(place);
-      resetAddPlaceDraft();
+  const handlePlaceSelect = useCallback((place: DiscoverablePlace) => {
+    setSelectedPlace(place);
 
-      if (typeof window !== 'undefined' && window.innerWidth < 768) {
-        setSidebarOpen(false);
-      }
-    },
-    [resetAddPlaceDraft]
-  );
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+  }, []);
 
   const handleRefreshPlaces = useCallback(() => {
-    if (!userLocation) {
+    if (!mapViewport) {
       return;
     }
 
-    void loadNearbyPlaces(userLocation.lat, userLocation.lng);
-  }, [loadNearbyPlaces, userLocation]);
+    void loadViewportPlaces(mapViewport);
+  }, [loadViewportPlaces, mapViewport]);
 
-  const handlePlaceNameChange = useCallback((name: string) => {
-    setAddPlaceDraft((currentDraft) =>
-      currentDraft
-        ? {
-            ...currentDraft,
-            name,
+  const handleSpeedtestComplete = useCallback(() => {
+    if (!mapViewport) {
+      return;
+    }
+
+    void loadViewportPlaces(mapViewport);
+  }, [loadViewportPlaces, mapViewport]);
+
+  const handlePlaceResolved = useCallback((place: DiscoverablePlace) => {
+    setSelectedPlace(place);
+    setPlaces((currentPlaces) =>
+      currentPlaces
+        .map((currentPlace) =>
+          currentPlace.google_place_id === place.google_place_id
+            ? {
+                ...currentPlace,
+                ...place,
+                isSpeedtested: true,
+              }
+            : currentPlace
+        )
+        .sort((left, right) => {
+          if (left.isSpeedtested !== right.isSpeedtested) {
+            return left.isSpeedtested ? -1 : 1;
           }
-        : currentDraft
+
+          return left.distance_km - right.distance_km;
+        })
     );
   }, []);
 
-  const handleSubmitNewPlace = useCallback(async () => {
-    if (!addPlaceDraft || !addPlaceDraft.name.trim()) {
-      return;
-    }
+  const handleViewportChange = useCallback(
+    (viewport: {
+      lat: number;
+      lng: number;
+      radiusKm: number;
+      north: number;
+      south: number;
+      east: number;
+      west: number;
+    }) => {
+      setMapViewport((currentViewport) => {
+        const latChanged = !currentViewport || Math.abs(currentViewport.lat - viewport.lat) > 0.001;
+        const lngChanged = !currentViewport || Math.abs(currentViewport.lng - viewport.lng) > 0.001;
+        const radiusChanged =
+          !currentViewport || Math.abs(currentViewport.radiusKm - viewport.radiusKm) > 0.5;
+        const northChanged =
+          !currentViewport || Math.abs(currentViewport.north - viewport.north) > 0.001;
+        const southChanged =
+          !currentViewport || Math.abs(currentViewport.south - viewport.south) > 0.001;
+        const eastChanged =
+          !currentViewport || Math.abs(currentViewport.east - viewport.east) > 0.001;
+        const westChanged =
+          !currentViewport || Math.abs(currentViewport.west - viewport.west) > 0.001;
 
-    try {
-      const response = await fetch('/api/places', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: addPlaceDraft.name.trim(),
-          lat: addPlaceDraft.lat,
-          lng: addPlaceDraft.lng,
-        }),
+        if (
+          !latChanged &&
+          !lngChanged &&
+          !radiusChanged &&
+          !northChanged &&
+          !southChanged &&
+          !eastChanged &&
+          !westChanged
+        ) {
+          return currentViewport;
+        }
+
+        void loadViewportPlaces(viewport);
+        return viewport;
       });
-      const data: { error?: string; place?: Place; requestId?: string } = await response.json();
-
-      if (!response.ok || !data.place) {
-        const errorMessage = data.error ?? 'Failed to add place';
-
-        logClientError('client.fetch.error', {
-          action: 'places.create',
-          endpoint: '/api/places',
-          status: response.status,
-          requestId: data.requestId,
-          message: errorMessage,
-        });
-        throw createLoggedClientError(errorMessage);
-      }
-
-      const createdPlace: NearbyPlace = {
-        ...data.place,
-        distance_km: 0,
-        avg_download_mbps: null,
-      };
-
-      setPlaces((currentPlaces) => [...currentPlaces, createdPlace]);
-      setSelectedPlace(data.place);
-      resetAddPlaceDraft();
-    } catch (error) {
-      if (!isLoggedClientError(error)) {
-        logClientError('client.fetch.error', {
-          action: 'places.create',
-          endpoint: '/api/places',
-          message: error instanceof Error ? error.message : 'Failed to add place',
-        });
-      }
-    }
-  }, [addPlaceDraft, resetAddPlaceDraft]);
-
-  const handleSpeedtestComplete = useCallback(() => {
-    if (!userLocation) {
-      return;
-    }
-
-    void loadNearbyPlaces(userLocation.lat, userLocation.lng);
-  }, [loadNearbyPlaces, userLocation]);
+    },
+    [loadViewportPlaces]
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#FAFAFA]">
@@ -242,7 +269,7 @@ export default function Home() {
             places={places}
             userLocation={userLocation}
             onPlaceSelect={handlePlaceSelect}
-            onAddPlace={handleAddPlace}
+            onViewportChange={handleViewportChange}
           />
         )}
 
@@ -251,15 +278,7 @@ export default function Home() {
             place={selectedPlace}
             onClose={handleCloseSelectedPlace}
             onSpeedtestComplete={handleSpeedtestComplete}
-          />
-        )}
-
-        {addPlaceDraft && (
-          <AddPlacePanel
-            draft={addPlaceDraft}
-            onNameChange={handlePlaceNameChange}
-            onSubmit={handleSubmitNewPlace}
-            onCancel={resetAddPlaceDraft}
+            onPlaceResolved={handlePlaceResolved}
           />
         )}
       </div>

@@ -178,6 +178,24 @@ export interface NearbyPlace extends Place {
   test_count?: number;
 }
 
+export interface DiscoverablePlace {
+  id?: string;
+  google_place_id: string;
+  name: string;
+  address: string | null;
+  lat: number;
+  lng: number;
+  created_at?: string;
+  distance_km: number;
+  rating?: number;
+  user_ratings_total?: number;
+  avg_download_mbps: number | null;
+  avg_upload_mbps?: number | null;
+  avg_latency_ms?: number | null;
+  test_count?: number;
+  isSpeedtested: boolean;
+}
+
 export interface PlaceSpeedStats {
   avg_download: number;
   avg_upload: number;
