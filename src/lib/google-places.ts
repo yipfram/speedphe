@@ -11,6 +11,23 @@ export interface GooglePlace {
   user_ratings_total?: number;
 }
 
+interface SearchNearbyCoffeeShopsOptions {
+  maxResultCount?: number;
+  rankPreference?: 'DISTANCE' | 'POPULARITY';
+}
+
+interface SearchViewportCoffeeShopsOptions {
+  maxResultCount?: number;
+  rankPreference?: 'DISTANCE' | 'RELEVANCE';
+}
+
+interface SearchViewportCoffeeShopsViewport {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
 interface GooglePlaceLocation {
   latitude: number;
   longitude: number;
@@ -87,9 +104,12 @@ function mapGooglePlace(place: GooglePlaceResponse): GooglePlace {
 export async function searchNearbyCoffeeShops(
   lat: number,
   lng: number,
-  radius: number = 5000
+  radius: number = 5000,
+  options: SearchNearbyCoffeeShopsOptions = {}
 ): Promise<GooglePlace[]> {
   const apiKey = getApiKey();
+  const maxResultCount = options.maxResultCount ?? 20;
+  const rankPreference = options.rankPreference ?? 'DISTANCE';
 
   const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
     method: 'POST',
@@ -100,8 +120,8 @@ export async function searchNearbyCoffeeShops(
         'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount',
     },
     body: JSON.stringify({
-      includedTypes: ['cafe'],
-      maxResultCount: 20,
+      includedPrimaryTypes: ['cafe'],
+      maxResultCount,
       locationRestriction: {
         circle: {
           center: {
@@ -111,7 +131,57 @@ export async function searchNearbyCoffeeShops(
           radius,
         },
       },
-      rankPreference: 'DISTANCE',
+      rankPreference,
+    }),
+  });
+
+  const data = (await response.json()) as GooglePlacesSearchResult;
+
+  if (!response.ok) {
+    throw new Error(getGoogleApiErrorMessage(data as GooglePlacesApiError, response.statusText));
+  }
+
+  if (!data.places || data.places.length === 0) {
+    return [];
+  }
+
+  return data.places.filter((place) => place.id && place.location).map(mapGooglePlace);
+}
+
+export async function searchViewportCoffeeShops(
+  viewport: SearchViewportCoffeeShopsViewport,
+  options: SearchViewportCoffeeShopsOptions = {}
+): Promise<GooglePlace[]> {
+  const apiKey = getApiKey();
+  const pageSize = options.maxResultCount ?? 20;
+  const rankPreference = options.rankPreference ?? 'RELEVANCE';
+
+  const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask':
+        'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount',
+    },
+    body: JSON.stringify({
+      textQuery: 'cafe',
+      pageSize,
+      locationRestriction: {
+        rectangle: {
+          low: {
+            latitude: viewport.south,
+            longitude: viewport.west,
+          },
+          high: {
+            latitude: viewport.north,
+            longitude: viewport.east,
+          },
+        },
+      },
+      rankPreference,
+      includedType: 'cafe',
+      strictTypeFiltering: true,
     }),
   });
 

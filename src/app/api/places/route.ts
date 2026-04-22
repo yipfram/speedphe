@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getDatabaseErrorDetails, getPool, type DiscoverablePlace } from '@/lib/db';
 import { getClientIp } from '@/lib/getClientIp';
-import { searchNearbyCoffeeShops } from '@/lib/google-places';
+import { searchViewportCoffeeShops } from '@/lib/google-places';
 import {
   apiErrorResponse,
   apiJsonResponse,
@@ -9,10 +9,12 @@ import {
   runLoggedQuery,
 } from '@/lib/api-logging';
 
-const TESTED_ONLY_RADIUS_KM = 10;
+const TESTED_ONLY_RADIUS_KM = 6;
 const MEDIUM_DENSITY_RADIUS_KM = 2.5;
-const MAX_UNTESTED_CLOSE_VIEW = 20;
-const MAX_UNTESTED_MEDIUM_VIEW = 8;
+const MAX_UNTESTED_CLOSE_VIEW = 30;
+const MAX_UNTESTED_MEDIUM_VIEW = 12;
+const GOOGLE_ONLY_MIN_RATING = 4;
+const GOOGLE_ONLY_MIN_REVIEWS = 8;
 
 function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const toRadians = (value: number) => (value * Math.PI) / 180;
@@ -37,6 +39,24 @@ function isWithinViewport(
       : place.lng >= viewport.west || place.lng <= viewport.east;
 
   return withinLat && withinLng;
+}
+
+function compareUntestedPlaces(left: DiscoverablePlace, right: DiscoverablePlace) {
+  const leftRating = left.rating ?? 0;
+  const rightRating = right.rating ?? 0;
+
+  if (leftRating !== rightRating) {
+    return rightRating - leftRating;
+  }
+
+  const leftReviews = left.user_ratings_total ?? 0;
+  const rightReviews = right.user_ratings_total ?? 0;
+
+  if (leftReviews !== rightReviews) {
+    return rightReviews - leftReviews;
+  }
+
+  return left.distance_km - right.distance_km;
 }
 
 export async function GET(request: NextRequest) {
@@ -67,8 +87,15 @@ export async function GET(request: NextRequest) {
             west: parseFloat(west),
           }
         : null;
-    const radiusMeters = Math.round(parsedRadiusKm * 1000);
-    const googlePlaces = await searchNearbyCoffeeShops(parsedLat, parsedLng, radiusMeters);
+    const googleSearchConfig =
+      parsedRadiusKm >= TESTED_ONLY_RADIUS_KM
+        ? { maxResultCount: 24, rankPreference: 'RELEVANCE' as const }
+        : parsedRadiusKm > MEDIUM_DENSITY_RADIUS_KM
+          ? { maxResultCount: 32, rankPreference: 'RELEVANCE' as const }
+          : { maxResultCount: 40, rankPreference: 'DISTANCE' as const };
+    const googlePlaces = viewport
+      ? await searchViewportCoffeeShops(viewport, googleSearchConfig)
+      : [];
     const pool = getPool();
     const result = await runLoggedQuery(
       pool,
@@ -168,6 +195,12 @@ export async function GET(request: NextRequest) {
           isSpeedtested: Boolean(localPlace?.id),
         };
       })
+      .filter(
+        (place) =>
+          place.isSpeedtested ||
+          ((place.rating ?? 0) >= GOOGLE_ONLY_MIN_RATING &&
+            (place.user_ratings_total ?? 0) >= GOOGLE_ONLY_MIN_REVIEWS)
+      )
       .sort((left, right) => {
         if (left.isSpeedtested !== right.isSpeedtested) {
           return left.isSpeedtested ? -1 : 1;
@@ -217,7 +250,7 @@ export async function GET(request: NextRequest) {
 
       untestedPlaces = places
         .filter((place) => !place.isSpeedtested)
-        .sort((left, right) => left.distance_km - right.distance_km)
+        .sort(compareUntestedPlaces)
         .slice(0, untestedLimit);
     }
 
