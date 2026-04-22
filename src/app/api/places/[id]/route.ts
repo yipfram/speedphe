@@ -6,7 +6,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
 
   try {
-    const placeResult = await pool.query('SELECT * FROM places WHERE id = $1', [id]);
+    const placeResult = await pool.query(
+      `SELECT id, name, address, lat, lng, google_place_id, created_at
+       FROM places
+       WHERE id = $1`,
+      [id]
+    );
 
     if (placeResult.rows.length === 0) {
       return NextResponse.json({ error: 'Place not found' }, { status: 404 });

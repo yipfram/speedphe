@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
+import { getClientIp } from '@/lib/getClientIp';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const pool = getPool();
@@ -9,7 +10,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const result = await pool.query(
-      `SELECT * FROM speedtests
+      `SELECT
+         id,
+         place_id,
+         download_mbps,
+         upload_mbps,
+         latency_ms,
+         jitter_ms,
+         packet_loss,
+         created_at
+       FROM speedtests
        WHERE place_id = $1
        ORDER BY created_at DESC
        LIMIT $2`,
@@ -38,11 +48,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
+    const clientIp = getClientIp(request);
+
     const result = await pool.query(
-      `INSERT INTO speedtests (place_id, download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [id, download_mbps, upload_mbps, latency_ms, jitter_ms || null, packet_loss || null]
+      `INSERT INTO speedtests (place_id, download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss, client_ip)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, place_id, download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss, created_at`,
+      [
+        id,
+        download_mbps,
+        upload_mbps,
+        latency_ms,
+        jitter_ms || null,
+        packet_loss || null,
+        clientIp || null,
+      ]
     );
 
     return NextResponse.json({ speedtest: result.rows[0] });

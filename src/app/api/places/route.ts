@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
+import { getClientIp } from '@/lib/getClientIp';
 
 export async function GET(request: NextRequest) {
   const pool = getPool();
@@ -60,16 +61,17 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { name, lat, lng, address, google_place_id } = body;
+    const clientIp = getClientIp(request);
 
     if (!name || lat === undefined || lng === undefined) {
       return NextResponse.json({ error: 'name, lat, and lng are required' }, { status: 400 });
     }
 
     const result = await pool.query(
-      `INSERT INTO places (name, lat, lng, address, google_place_id)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [name, lat, lng, address || null, google_place_id || null]
+      `INSERT INTO places (name, lat, lng, address, google_place_id, client_ip)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, name, address, lat, lng, google_place_id, created_at`,
+      [name, lat, lng, address || null, google_place_id || null, clientIp || null]
     );
 
     return NextResponse.json({ place: result.rows[0] });
