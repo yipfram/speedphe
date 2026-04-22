@@ -12,7 +12,14 @@ const eslintConfig = [
   ...compat.extends('next/core-web-vitals'),
   ...compat.extends('next/typescript'),
   {
-    ignores: ['.next/**', 'out/**', 'build/**', 'node_modules/**', 'next-env.d.ts'],
+    ignores: [
+      '.next/**',
+      'out/**',
+      'build/**',
+      'node_modules/**',
+      'next-env.d.ts',
+      'db-migrate.js',
+    ],
   },
   {
     files: ['**/*.{ts,tsx}'],

@@ -15,8 +15,26 @@ interface SpeedResult {
   upload: number;
   latency: number;
   jitter: number;
-  packetLoss: number;
 }
+
+type SpeedTestConfig = NonNullable<ConstructorParameters<typeof SpeedTest>[0]>;
+
+const SPEEDTEST_MEASUREMENTS: SpeedTestConfig['measurements'] = [
+  { type: 'latency', numPackets: 1 },
+  { type: 'download', bytes: 1e5, count: 1, bypassMinDuration: true },
+  { type: 'latency', numPackets: 20 },
+  { type: 'download', bytes: 1e5, count: 9 },
+  { type: 'download', bytes: 1e6, count: 8 },
+  { type: 'upload', bytes: 1e5, count: 8 },
+  { type: 'upload', bytes: 1e6, count: 6 },
+  { type: 'download', bytes: 1e7, count: 6 },
+  { type: 'upload', bytes: 1e7, count: 4 },
+  { type: 'download', bytes: 2.5e7, count: 4 },
+  { type: 'upload', bytes: 2.5e7, count: 4 },
+  { type: 'download', bytes: 1e8, count: 3 },
+  { type: 'upload', bytes: 5e7, count: 3 },
+  { type: 'download', bytes: 2.5e8, count: 2 },
+];
 
 export default function Speedtest({ place, onComplete }: SpeedtestProps) {
   const [status, setStatus] = useState<'idle' | 'running' | 'complete'>('idle');
@@ -30,21 +48,41 @@ export default function Speedtest({ place, onComplete }: SpeedtestProps) {
     return `${mbps.toFixed(1)} Mbps`;
   };
 
+  const saveResults = async (result: SpeedResult) => {
+    const response = await fetch('/api/speedtests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        place_id: place.id,
+        download_mbps: result.download,
+        upload_mbps: result.upload,
+        latency_ms: result.latency,
+        jitter_ms: result.jitter,
+        packet_loss: null,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save speedtest results');
+    }
+  };
+
   const startTest = async () => {
     setStatus('running');
     setError(null);
     setProgress(0);
 
     try {
-      const SpeedTestModule = await import('@cloudflare/speedtest');
-      const SpeedTestClass = SpeedTestModule.default;
-
-      engineRef.current = new SpeedTestClass({
+      const speedTestOptions = {
         autoStart: false,
-      });
+        measurements: SPEEDTEST_MEASUREMENTS,
+      } satisfies ConstructorParameters<typeof SpeedTest>[0];
+
+      engineRef.current?.pause();
+      engineRef.current = new SpeedTest(speedTestOptions);
 
       engineRef.current.onRunningChange = (running: boolean) => {
-        if (!running && status === 'running') {
+        if (!running && engineRef.current?.isFinished) {
           setStatus('complete');
         }
       };
@@ -56,45 +94,37 @@ export default function Speedtest({ place, onComplete }: SpeedtestProps) {
         let current = 0;
 
         if (currentResults.getDownloadBandwidthPoints().length) {
-          current += 30 * (currentResults.getDownloadBandwidthPoints().length / 10);
+          current += 40 * Math.min(currentResults.getDownloadBandwidthPoints().length / 10, 1);
         }
         if (currentResults.getUploadBandwidthPoints().length) {
-          current += 30 * (currentResults.getUploadBandwidthPoints().length / 10);
+          current += 35 * Math.min(currentResults.getUploadBandwidthPoints().length / 8, 1);
         }
         if (currentResults.getUnloadedLatency() !== undefined) {
-          current += 20;
-        }
-        if (currentResults.getPacketLoss() !== undefined) {
-          current += 20;
+          current += 25;
         }
 
         setProgress(Math.min(current, 100));
       };
 
-      engineRef.current.onFinish = (results: Results) => {
+      engineRef.current.onFinish = async (results: Results) => {
         const result: SpeedResult = {
           download: (results.getDownloadBandwidth() || 0) / 1000000,
           upload: (results.getUploadBandwidth() || 0) / 1000000,
           latency: results.getUnloadedLatency() || 0,
           jitter: results.getUnloadedJitter() || 0,
-          packetLoss: results.getPacketLoss() || 0,
         };
 
         setResults(result);
         setStatus('complete');
+        setProgress(100);
 
-        fetch('/api/speedtests', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            place_id: place.id,
-            download_mbps: result.download,
-            upload_mbps: result.upload,
-            latency_ms: result.latency,
-            jitter_ms: result.jitter,
-            packet_loss: result.packetLoss,
-          }),
-        }).then(() => onComplete());
+        try {
+          await saveResults(result);
+          onComplete();
+        } catch (saveError) {
+          console.error('Speedtest save error:', saveError);
+          setError('Test completed, but saving the results failed.');
+        }
       };
 
       engineRef.current.onError = (e: string) => {
@@ -115,7 +145,7 @@ export default function Speedtest({ place, onComplete }: SpeedtestProps) {
       {status === 'idle' && (
         <div className="text-center py-2">
           <p className="text-sm text-[var(--text-muted)] mb-4">
-            Measure internet speed at this location
+            Measure download, upload, latency, and jitter at this location
           </p>
           <button
             onClick={startTest}

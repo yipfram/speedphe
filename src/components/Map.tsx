@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { MapLoadingFallback } from '@/components/home/MapLoadingFallback';
 import { Place, NearbyPlace } from '@/lib/db';
 
 interface MapProps {
@@ -182,14 +183,7 @@ export default function Map({ places, userLocation, onPlaceSelect, onAddPlace }:
   }, [isMounted, L, places, userLocation, stableOnPlaceSelect, stableOnAddPlace]);
 
   if (!isMounted) {
-    return (
-      <div className="flex items-center justify-center h-full bg-[#FAFAFA]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-[#2D1B69] border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-(--text-muted) font-medium">Loading map...</p>
-        </div>
-      </div>
-    );
+    return <MapLoadingFallback />;
   }
 
   return <div ref={containerRef} className="absolute inset-0" />;
