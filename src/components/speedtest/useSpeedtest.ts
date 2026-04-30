@@ -2,6 +2,7 @@
 
 import type { Results } from '@cloudflare/speedtest';
 import SpeedTest from '@cloudflare/speedtest';
+import { getCityFromColo } from '@/lib/cloudflare-colo';
 import { createLoggedClientError, isLoggedClientError, logClientError } from '@/lib/logging';
 import { useEffect, useRef, useState } from 'react';
 
@@ -20,6 +21,11 @@ export interface AimScores {
   streaming: AimScore | null;
   gaming: AimScore | null;
   rtc: AimScore | null;
+}
+
+export interface ServerInfo {
+  colo: string;
+  city: string;
 }
 
 export interface SpeedResult {
@@ -83,13 +89,18 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
   const [status, setStatus] = useState<'idle' | 'running' | 'complete'>('idle');
   const [results, setResults] = useState<SpeedResult>(EMPTY_RESULTS);
   const [scores, setScores] = useState<AimScores>(EMPTY_SCORES);
+  const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
+  const serverInfoRef = useRef<ServerInfo | null>(null);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const engineRef = useRef<InstanceType<typeof SpeedTest> | null>(null);
+  const restoreFetchRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     return () => {
       engineRef.current?.pause();
+      restoreFetchRef.current?.();
+      restoreFetchRef.current = null;
     };
   }, []);
 
@@ -98,7 +109,34 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
     return `${mbps.toFixed(1)} Mbps`;
   };
 
-  const saveResults = async (placeId: string, result: SpeedResult, aimScores: AimScores) => {
+  const captureServerInfoFromFetch = (): (() => void) => {
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = async (...args) => {
+      const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request).url;
+      const response = await originalFetch(...args);
+      if (url.includes('speed.cloudflare.com')) {
+        const colo = response.headers.get('cf-meta-colo')?.trim();
+        if (colo && !serverInfoRef.current) {
+          const info = { colo, city: getCityFromColo(colo) };
+          serverInfoRef.current = info;
+          setServerInfo(info);
+        }
+      }
+      return response;
+    };
+
+    return () => {
+      globalThis.fetch = originalFetch;
+    };
+  };
+
+  const saveResults = async (
+    placeId: string,
+    result: SpeedResult,
+    aimScores: AimScores,
+    sInfo: ServerInfo | null
+  ) => {
     const response = await fetch('/api/speedtests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -110,6 +148,7 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
         jitter_ms: result.jitter,
         packet_loss: null,
         aim_scores: aimScores,
+        server_info: sInfo,
       }),
     });
     const data: { error?: string; requestId?: string } = await response.json();
@@ -134,9 +173,13 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
     setProgress(0);
     setResults(EMPTY_RESULTS);
     setScores(EMPTY_SCORES);
+    setServerInfo(null);
+    serverInfoRef.current = null;
 
     try {
       const placeId = await ensurePlaceId();
+
+      restoreFetchRef.current = captureServerInfoFromFetch();
       const speedTestOptions = {
         autoStart: false,
         measurements: SPEEDTEST_MEASUREMENTS,
@@ -178,6 +221,9 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
       };
 
       engineRef.current.onFinish = async (speedResults: Results) => {
+        restoreFetchRef.current?.();
+        restoreFetchRef.current = null;
+
         const result = getCurrentResults(speedResults);
         const aimScores = getFinalScores(speedResults);
 
@@ -195,7 +241,8 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
               latency: result.latency ?? 0,
               jitter: result.jitter ?? 0,
             },
-            aimScores
+            aimScores,
+            serverInfoRef.current
           );
           onComplete();
         } catch (saveError) {
@@ -212,6 +259,8 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
       };
 
       engineRef.current.onError = (speedtestError: string) => {
+        restoreFetchRef.current?.();
+        restoreFetchRef.current = null;
         setError(speedtestError || 'Speedtest failed');
         setStatus('idle');
       };
@@ -234,6 +283,7 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
     progress,
     results,
     scores,
+    serverInfo,
     startTest,
     status,
   };

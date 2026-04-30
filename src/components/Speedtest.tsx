@@ -72,10 +72,11 @@ export default function Speedtest({ place, onComplete, onPlaceResolved }: Speedt
     return data.place.id;
   };
 
-  const { error, formatSpeed, progress, results, scores, startTest, status } = useSpeedtest({
-    ensurePlaceId: ensureLocalPlaceId,
-    onComplete,
-  });
+  const { error, formatSpeed, progress, results, scores, serverInfo, startTest, status } =
+    useSpeedtest({
+      ensurePlaceId: ensureLocalPlaceId,
+      onComplete,
+    });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -192,6 +193,7 @@ export default function Speedtest({ place, onComplete, onPlaceResolved }: Speedt
           progress={progress}
           results={results}
           scores={scores}
+          serverInfo={serverInfo}
           formatSpeed={formatSpeed}
         />
       )}

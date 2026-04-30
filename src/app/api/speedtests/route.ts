@@ -14,8 +14,16 @@ export async function POST(request: NextRequest) {
   try {
     const pool = getPool();
     const body = await request.json();
-    const { place_id, download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss, aim_scores } =
-      body;
+    const {
+      place_id,
+      download_mbps,
+      upload_mbps,
+      latency_ms,
+      jitter_ms,
+      packet_loss,
+      aim_scores,
+      server_info,
+    } = body;
     const clientIp = getClientIp(request);
 
     if (!place_id) {
@@ -32,9 +40,9 @@ export async function POST(request: NextRequest) {
 
     const result = await runLoggedQuery(
       pool,
-      `INSERT INTO speedtests (place_id, download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss, aim_scores, client_ip)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, place_id, download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss, aim_scores, created_at`,
+      `INSERT INTO speedtests (place_id, download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss, aim_scores, server_info, client_ip)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, place_id, download_mbps, upload_mbps, latency_ms, jitter_ms, packet_loss, aim_scores, server_info, created_at`,
       [
         place_id,
         download_mbps,
@@ -43,6 +51,7 @@ export async function POST(request: NextRequest) {
         jitter_ms || null,
         packet_loss || null,
         aim_scores ? JSON.stringify(aim_scores) : null,
+        server_info ? JSON.stringify(server_info) : null,
         clientIp || null,
       ],
       requestContext,
