@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL('https://speedphe.rrchs.fr'),
   title: {
-    default: 'Casphe | Find Cafes With Fast Wi-Fi for Work',
+    default: 'Casphe | Fast Wi-Fi Cafes for Remote Work in Vietnam',
     template: '%s | Casphe',
   },
   description:
@@ -24,19 +24,28 @@ export const metadata: Metadata = {
     canonical: '/',
   },
   openGraph: {
-    title: 'Casphe | Find Cafes With Fast Wi-Fi for Work',
+    title: 'Casphe | Fast Wi-Fi Cafes for Remote Work in Vietnam',
     description:
       'Compare real cafe Wi-Fi speed tests and find better places to work remotely in Hanoi and Ho Chi Minh City.',
     url: 'https://speedphe.rrchs.fr',
     siteName: 'Casphe',
     type: 'website',
     locale: 'en_US',
+    images: [
+      {
+        url: '/opengraph-image',
+        width: 1200,
+        height: 630,
+        alt: 'Casphe map of cafes with fast Wi-Fi for remote work',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Casphe | Find Cafes With Fast Wi-Fi for Work',
+    title: 'Casphe | Fast Wi-Fi Cafes for Remote Work in Vietnam',
     description:
       'Compare real cafe Wi-Fi speed tests and find better places to work remotely in Hanoi and Ho Chi Minh City.',
+    images: ['/opengraph-image'],
   },
 };
 
