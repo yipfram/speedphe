@@ -8,7 +8,7 @@ Casphé — Next.js 15 (App Router) + TypeScript + Tailwind CSS v4 + Leaflet map
 
 - `bun run dev` — Start Next.js dev server
 - `bun run build` — Lints first, then builds (`bun run lint && bunx next build`). **Always run this before considering work done** to catch errors.
-- `bun run lint` — ESLint with `--fix` (auto-fixes). Checks for errors, unused vars (prefixed `_` ignored), `no-console` (warn, `console.warn/error` allowed), `no-debugger`, `prefer-const`, Prettier formatting as ESLint error, max 400 lines per file.
+- `bun run lint` — ESLint with `--fix` (auto-fixes). Checks for errors, unused vars (prefixed `_` ignored), `no-console` (warn, `console.warn/error` allowed), `no-debugger`, `prefer-const`, Prettier formatting as ESLint error, max 300 lines per file.
 - `bun run lint:check` — ESLint without auto-fix (read-only check).
 - `bun run format` — Prettier write (formats all files in-place). Config: single quotes, trailing comma es5, print width 100, tab width 2, semicolons, LF line endings.
 - `bun run format:check` — Prettier check (read-only, fails if unformatted).
@@ -36,5 +36,5 @@ Casphé — Next.js 15 (App Router) + TypeScript + Tailwind CSS v4 + Leaflet map
 - ESLint flat config (`eslint.config.mjs`) with Next.js, TypeScript, and Prettier plugins
 - No `console.log` (use `console.warn` or `console.error` if needed)
 - Prefix unused variables/args with `_`
-- Max 400 lines per file (excluding blanks and comments)
+- Max 300 lines per file (excluding blanks and comments)
 - React hooks rules enforced

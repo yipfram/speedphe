@@ -259,9 +259,43 @@ export default function Map({ places, userLocation, onPlaceSelect, onViewportCha
       .bindPopup('<div style="font-weight: 500;">Your location</div>');
   }, [L, userLocation]);
 
+  const handleRecenter = () => {
+    const map = mapRef.current;
+    if (!map || !userLocation) return;
+    map.setView([userLocation.lat, userLocation.lng], 18, { animate: true });
+  };
+
   if (!isMounted) {
     return <MapLoadingFallback />;
   }
 
-  return <div ref={containerRef} className="absolute inset-0" />;
+  return (
+    <div className="absolute inset-0">
+      <div ref={containerRef} className="absolute inset-0" />
+      {userLocation && (
+        <button
+          onClick={handleRecenter}
+          className="leaflet-recenter-btn absolute right-4 bottom-8 z-[1000] flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.06)] transition-all hover:bg-[#ede9f6] active:scale-95"
+          aria-label="Recenter map on your location"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--primary, #2d1b69)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="4" />
+            <line x1="12" y1="2" x2="12" y2="6" />
+            <line x1="12" y1="18" x2="12" y2="22" />
+            <line x1="2" y1="12" x2="6" y2="12" />
+            <line x1="18" y1="12" x2="22" y2="12" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
 }

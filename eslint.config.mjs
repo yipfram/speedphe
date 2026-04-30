@@ -60,7 +60,7 @@ const eslintConfig = [
       'react/jsx-no-duplicate-props': 'error',
       'react/no-unescaped-entities': 'off',
       'react/prop-types': 'off',
-      'max-lines': ['error', { max: 400, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
     },
   },
 ];
