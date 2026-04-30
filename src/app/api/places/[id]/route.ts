@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { getDatabaseErrorDetails, getPool } from '@/lib/db';
+import { getPool } from '@/lib/db';
 import {
-  apiErrorResponse,
+  apiAppErrorResponse,
   apiJsonResponse,
   createApiRequestContext,
   runLoggedQuery,
@@ -53,8 +53,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       { context: { found: true } }
     );
   } catch (error) {
-    const { message, status } = getDatabaseErrorDetails(error);
-
-    return apiErrorResponse(requestContext, message, error, { status });
+    return apiAppErrorResponse(requestContext, error);
   }
 }

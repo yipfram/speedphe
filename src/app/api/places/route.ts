@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
-import { getDatabaseErrorDetails, getPool, type DiscoverablePlace } from '@/lib/db';
+import { createGooglePlacesAppError } from '@/lib/app-errors';
+import { getPool, type DiscoverablePlace } from '@/lib/db';
 import { getClientIp } from '@/lib/getClientIp';
-import { searchViewportCoffeeShops } from '@/lib/google-places';
+import { searchViewportCoffeeShops, type GooglePlace } from '@/lib/google-places';
 import {
-  apiErrorResponse,
+  apiAppErrorResponse,
   apiJsonResponse,
   createApiRequestContext,
   runLoggedQuery,
@@ -93,9 +94,23 @@ export async function GET(request: NextRequest) {
         : parsedRadiusKm > MEDIUM_DENSITY_RADIUS_KM
           ? { maxResultCount: 32, rankPreference: 'RELEVANCE' as const }
           : { maxResultCount: 40, rankPreference: 'DISTANCE' as const };
-    const googlePlaces = viewport
-      ? await searchViewportCoffeeShops(viewport, googleSearchConfig)
-      : [];
+    let googlePlaces: GooglePlace[] = [];
+
+    if (viewport) {
+      try {
+        googlePlaces = await searchViewportCoffeeShops(viewport, googleSearchConfig);
+      } catch (error) {
+        throw createGooglePlacesAppError(
+          'places.load_nearby',
+          {
+            hasViewport: true,
+            radiusKm: parsedRadiusKm,
+          },
+          error
+        );
+      }
+    }
+
     const pool = getPool();
     const result = await runLoggedQuery(
       pool,
@@ -268,9 +283,7 @@ export async function GET(request: NextRequest) {
       { context: { resultCount: mergedPlaces.length } }
     );
   } catch (error) {
-    const { message, status } = getDatabaseErrorDetails(error);
-
-    return apiErrorResponse(requestContext, message, error, { status });
+    return apiAppErrorResponse(requestContext, error);
   }
 }
 
@@ -315,8 +328,6 @@ export async function POST(request: NextRequest) {
 
     return apiJsonResponse(requestContext, { place: result.rows[0] }, { status: 201 });
   } catch (error) {
-    const { message, status } = getDatabaseErrorDetails(error);
-
-    return apiErrorResponse(requestContext, message, error, { status });
+    return apiAppErrorResponse(requestContext, error);
   }
 }

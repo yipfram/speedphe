@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { getDatabaseErrorDetails, getPool } from '@/lib/db';
+import { getPool } from '@/lib/db';
 import { getClientIp } from '@/lib/getClientIp';
 import {
-  apiErrorResponse,
+  apiAppErrorResponse,
   apiJsonResponse,
   createApiRequestContext,
   runLoggedQuery,
@@ -60,8 +60,6 @@ export async function POST(request: NextRequest) {
 
     return apiJsonResponse(requestContext, { speedtest: result.rows[0] }, { status: 201 });
   } catch (error) {
-    const { message, status } = getDatabaseErrorDetails(error);
-
-    return apiErrorResponse(requestContext, message, error, { status });
+    return apiAppErrorResponse(requestContext, error);
   }
 }

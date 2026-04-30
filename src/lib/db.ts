@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { AppError, createConfigAppError } from '@/lib/app-errors';
 import { logServerEvent } from '@/lib/logging';
 
 let _pool: Pool | null = null;
@@ -44,6 +45,7 @@ export function getDatabaseErrorDetails(error: unknown): {
   classification: 'connection_error' | 'dns_resolution' | 'query_error';
   errorCode?: string;
   hostname?: string;
+  originalMessage?: string;
   message: string;
   status: number;
   syscall?: string;
@@ -75,6 +77,7 @@ export function getDatabaseErrorDetails(error: unknown): {
       classification: 'dns_resolution',
       errorCode: matchingCandidate?.code,
       hostname: matchingCandidate?.hostname,
+      originalMessage: matchingCandidate?.message,
       message:
         'Database host could not be resolved. Check DATABASE_URL and the server DNS/network configuration.',
       status: 503,
@@ -87,6 +90,7 @@ export function getDatabaseErrorDetails(error: unknown): {
       classification: 'connection_error',
       errorCode: matchingCandidate?.code,
       hostname: matchingCandidate?.hostname,
+      originalMessage: matchingCandidate?.message,
       message:
         'Database connection timed out. Check DATABASE_URL and that PostgreSQL is reachable.',
       status: 503,
@@ -98,10 +102,34 @@ export function getDatabaseErrorDetails(error: unknown): {
     classification: 'query_error',
     errorCode: matchingCandidate?.code,
     hostname: matchingCandidate?.hostname,
+    originalMessage: matchingCandidate?.message,
     message: 'Database request failed.',
     status: 500,
     syscall: matchingCandidate?.syscall,
   };
+}
+
+export function createDatabaseAppError(error: unknown, operation: string) {
+  const details = getDatabaseErrorDetails(error);
+
+  return new AppError(`Database operation failed during ${operation}`, {
+    cause: error,
+    code: details.status === 503 ? 'DB_UNREACHABLE' : 'DB_QUERY_FAILED',
+    details: {
+      classification: details.classification,
+      errorCode: details.errorCode,
+      hostname: details.hostname,
+      operation,
+      originalMessage: details.originalMessage,
+      syscall: details.syscall,
+    },
+    publicMessage:
+      details.status === 503
+        ? "We couldn't load nearby places right now. Please try again in a moment."
+        : 'We hit a problem while loading data. Please try again in a moment.',
+    source: 'database',
+    status: details.status,
+  });
 }
 
 export function getPool(): Pool {
@@ -113,11 +141,30 @@ export function getPool(): Pool {
           variable: 'DATABASE_URL',
         },
       });
-      throw new Error('Missing DATABASE_URL environment variable');
+      throw createConfigAppError('Missing DATABASE_URL environment variable', {
+        variable: 'DATABASE_URL',
+      });
     }
 
     const connectionTimeoutMs = Number(process.env.DB_CONNECTION_TIMEOUT_MS ?? '5000');
-    const parsedDatabaseUrl = new URL(databaseUrl);
+    let parsedDatabaseUrl: URL;
+
+    try {
+      parsedDatabaseUrl = new URL(databaseUrl);
+    } catch (error) {
+      logServerEvent('error', 'config.invalid_database_url', {
+        context: {
+          variable: 'DATABASE_URL',
+        },
+      });
+      throw createConfigAppError(
+        'Invalid DATABASE_URL environment variable',
+        {
+          variable: 'DATABASE_URL',
+        },
+        error
+      );
+    }
 
     _pool = new Pool({
       connectionString: databaseUrl,

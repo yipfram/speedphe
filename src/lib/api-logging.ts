@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { Pool, QueryResult, QueryResultRow } from 'pg';
-import { getDatabaseErrorDetails } from '@/lib/db';
+import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { toAppError } from '@/lib/app-errors';
+import { createDatabaseAppError, getDatabaseErrorDetails } from '@/lib/db';
 import { getRequestId, logServerEvent, normalizeError } from '@/lib/logging';
 
 interface ApiRequestContext {
@@ -11,6 +12,7 @@ interface ApiRequestContext {
 }
 
 interface ApiResponseOptions {
+  code?: string;
   context?: Record<string, unknown>;
   status?: number;
 }
@@ -89,6 +91,7 @@ export function apiErrorResponse(
 
   return NextResponse.json(
     {
+      code: options.code,
       error: message,
       requestId: requestContext.requestId,
     },
@@ -99,6 +102,24 @@ export function apiErrorResponse(
   );
 }
 
+export function apiAppErrorResponse(
+  requestContext: ApiRequestContext,
+  error: unknown,
+  options: Omit<ApiResponseOptions, 'code' | 'status'> = {}
+) {
+  const appError = toAppError(error);
+
+  return apiErrorResponse(requestContext, appError.publicMessage, appError, {
+    code: appError.code,
+    context: {
+      ...options.context,
+      details: appError.details,
+      source: appError.source,
+    },
+    status: appError.status,
+  });
+}
+
 export async function runLoggedQuery<T extends QueryResultRow>(
   pool: Pool,
   sql: string,
@@ -107,11 +128,37 @@ export async function runLoggedQuery<T extends QueryResultRow>(
   operation: string
 ): Promise<QueryResult<T>> {
   const startedAt = Date.now();
+  let client: PoolClient;
 
   try {
-    return await pool.query<T>(sql, values);
+    client = await pool.connect();
   } catch (error) {
     const details = getDatabaseErrorDetails(error);
+    const appError = createDatabaseAppError(error, `${operation}.connect`);
+
+    logServerEvent('error', 'db.connection.error', {
+      requestId: requestContext.requestId,
+      route: requestContext.route,
+      method: requestContext.method,
+      durationMs: getDurationMs(startedAt),
+      context: {
+        operation,
+        classification: details.classification,
+        errorCode: details.errorCode,
+        hostname: details.hostname,
+        originalMessage: details.originalMessage,
+        syscall: details.syscall,
+      },
+    });
+
+    throw appError;
+  }
+
+  try {
+    return await client.query<T>(sql, values);
+  } catch (error) {
+    const details = getDatabaseErrorDetails(error);
+    const appError = createDatabaseAppError(error, `${operation}.query`);
 
     logServerEvent('error', 'db.query.error', {
       requestId: requestContext.requestId,
@@ -123,11 +170,14 @@ export async function runLoggedQuery<T extends QueryResultRow>(
         classification: details.classification,
         errorCode: details.errorCode,
         hostname: details.hostname,
+        originalMessage: details.originalMessage,
+        queryStatus: details.status,
         syscall: details.syscall,
-        message: details.message,
       },
     });
 
-    throw error;
+    throw appError;
+  } finally {
+    client.release();
   }
 }
