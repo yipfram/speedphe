@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS speedtests (
   latency_ms FLOAT NOT NULL,
   jitter_ms FLOAT,
   packet_loss FLOAT,
+  aim_scores JSONB,
   client_ip INET,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -37,3 +38,4 @@ CREATE INDEX IF NOT EXISTS idx_speedtests_created_at ON speedtests(created_at);
 -- Migrations: add client_ip columns if missing (for existing databases)
 ALTER TABLE places ADD COLUMN IF NOT EXISTS client_ip INET;
 ALTER TABLE speedtests ADD COLUMN IF NOT EXISTS client_ip INET;
+ALTER TABLE speedtests ADD COLUMN IF NOT EXISTS aim_scores JSONB;

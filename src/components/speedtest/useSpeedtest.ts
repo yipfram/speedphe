@@ -10,6 +10,18 @@ interface UseSpeedtestParams {
   onComplete: () => void;
 }
 
+export interface AimScore {
+  points: number;
+  classificationIdx: number;
+  classificationName: string;
+}
+
+export interface AimScores {
+  streaming: AimScore | null;
+  gaming: AimScore | null;
+  rtc: AimScore | null;
+}
+
 export interface SpeedResult {
   download: number | null;
   upload: number | null;
@@ -22,15 +34,18 @@ type SpeedTestConfig = NonNullable<ConstructorParameters<typeof SpeedTest>[0]>;
 const SPEEDTEST_MEASUREMENTS: SpeedTestConfig['measurements'] = [
   { type: 'latency', numPackets: 1 },
   { type: 'download', bytes: 1e5, count: 1, bypassMinDuration: true },
-  { type: 'latency', numPackets: 10 },
-  { type: 'download', bytes: 1e5, count: 5 },
-  { type: 'download', bytes: 1e6, count: 4 },
-  { type: 'upload', bytes: 1e5, count: 4 },
-  { type: 'upload', bytes: 1e6, count: 4 },
-  { type: 'download', bytes: 1e7, count: 3 },
-  { type: 'upload', bytes: 1e7, count: 3 },
-  { type: 'download', bytes: 2.5e7, count: 2 },
-  { type: 'upload', bytes: 2.5e7, count: 2 },
+  { type: 'latency', numPackets: 20 },
+  { type: 'download', bytes: 1e5, count: 9 },
+  { type: 'download', bytes: 1e6, count: 8 },
+  { type: 'upload', bytes: 1e5, count: 8 },
+  { type: 'upload', bytes: 1e6, count: 6 },
+  { type: 'download', bytes: 1e7, count: 6 },
+  { type: 'upload', bytes: 1e7, count: 4 },
+  { type: 'download', bytes: 2.5e7, count: 4 },
+  { type: 'upload', bytes: 2.5e7, count: 4 },
+  { type: 'download', bytes: 1e8, count: 3 },
+  { type: 'upload', bytes: 5e7, count: 3 },
+  { type: 'download', bytes: 2.5e8, count: 2 },
 ];
 
 const EMPTY_RESULTS: SpeedResult = {
@@ -40,6 +55,12 @@ const EMPTY_RESULTS: SpeedResult = {
   jitter: null,
 };
 
+const EMPTY_SCORES: AimScores = {
+  streaming: null,
+  gaming: null,
+  rtc: null,
+};
+
 const getCurrentResults = (speedResults: Results): SpeedResult => ({
   download: (speedResults.getDownloadBandwidth() ?? 0) / 1000000 || null,
   upload: (speedResults.getUploadBandwidth() ?? 0) / 1000000 || null,
@@ -47,10 +68,21 @@ const getCurrentResults = (speedResults: Results): SpeedResult => ({
   jitter: speedResults.getUnloadedJitter() ?? null,
 });
 
+const getFinalScores = (speedResults: Results): AimScores => {
+  const raw = speedResults.getScores?.();
+  if (!raw) return EMPTY_SCORES;
+  return {
+    streaming: raw.streaming ?? null,
+    gaming: raw.gaming ?? null,
+    rtc: raw.rtc ?? null,
+  };
+};
+
 // TODO: Implement loss packets
 export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) {
   const [status, setStatus] = useState<'idle' | 'running' | 'complete'>('idle');
   const [results, setResults] = useState<SpeedResult>(EMPTY_RESULTS);
+  const [scores, setScores] = useState<AimScores>(EMPTY_SCORES);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const engineRef = useRef<InstanceType<typeof SpeedTest> | null>(null);
@@ -66,7 +98,7 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
     return `${mbps.toFixed(1)} Mbps`;
   };
 
-  const saveResults = async (placeId: string, result: SpeedResult) => {
+  const saveResults = async (placeId: string, result: SpeedResult, aimScores: AimScores) => {
     const response = await fetch('/api/speedtests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -77,6 +109,7 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
         latency_ms: result.latency,
         jitter_ms: result.jitter,
         packet_loss: null,
+        aim_scores: aimScores,
       }),
     });
     const data: { error?: string; requestId?: string } = await response.json();
@@ -100,13 +133,20 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
     setError(null);
     setProgress(0);
     setResults(EMPTY_RESULTS);
+    setScores(EMPTY_SCORES);
 
     try {
       const placeId = await ensurePlaceId();
       const speedTestOptions = {
         autoStart: false,
         measurements: SPEEDTEST_MEASUREMENTS,
-      } satisfies ConstructorParameters<typeof SpeedTest>[0];
+        measureDownloadLoadedLatency: false,
+        measureUploadLoadedLatency: false,
+        logAimApiUrl: null,
+        logMeasurementApiUrl: null,
+        cfTraceUrl: null,
+        rpkiInvalidHost: null,
+      } as ConstructorParameters<typeof SpeedTest>[0];
 
       engineRef.current?.pause();
       engineRef.current = new SpeedTest(speedTestOptions);
@@ -125,10 +165,10 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
         let current = 0;
 
         if (currentResults.getDownloadBandwidthPoints().length) {
-          current += 40 * Math.min(currentResults.getDownloadBandwidthPoints().length / 10, 1);
+          current += 40 * Math.min(currentResults.getDownloadBandwidthPoints().length / 30, 1);
         }
         if (currentResults.getUploadBandwidthPoints().length) {
-          current += 35 * Math.min(currentResults.getUploadBandwidthPoints().length / 8, 1);
+          current += 35 * Math.min(currentResults.getUploadBandwidthPoints().length / 24, 1);
         }
         if (currentResults.getUnloadedLatency() !== undefined) {
           current += 25;
@@ -139,18 +179,24 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
 
       engineRef.current.onFinish = async (speedResults: Results) => {
         const result = getCurrentResults(speedResults);
+        const aimScores = getFinalScores(speedResults);
 
         setResults(result);
+        setScores(aimScores);
         setStatus('complete');
         setProgress(100);
 
         try {
-          await saveResults(placeId, {
-            download: result.download ?? 0,
-            upload: result.upload ?? 0,
-            latency: result.latency ?? 0,
-            jitter: result.jitter ?? 0,
-          });
+          await saveResults(
+            placeId,
+            {
+              download: result.download ?? 0,
+              upload: result.upload ?? 0,
+              latency: result.latency ?? 0,
+              jitter: result.jitter ?? 0,
+            },
+            aimScores
+          );
           onComplete();
         } catch (saveError) {
           if (!isLoggedClientError(saveError)) {
@@ -187,6 +233,7 @@ export function useSpeedtest({ ensurePlaceId, onComplete }: UseSpeedtestParams) 
     formatSpeed,
     progress,
     results,
+    scores,
     startTest,
     status,
   };
