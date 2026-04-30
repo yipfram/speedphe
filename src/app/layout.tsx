@@ -13,9 +13,31 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Casph\u00e9 - Coffee Shop WiFi Speed Map',
+  metadataBase: new URL('https://speedphe.rrchs.fr'),
+  title: {
+    default: 'Casphe | Find Cafes With Fast Wi-Fi for Work',
+    template: '%s | Casphe',
+  },
   description:
-    'Find coffee shops with fast WiFi for remote work. Test and compare internet speeds at cafes near you.',
+    'Compare real cafe Wi-Fi speed tests and find better places to work remotely in Hanoi and Ho Chi Minh City.',
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: 'Casphe | Find Cafes With Fast Wi-Fi for Work',
+    description:
+      'Compare real cafe Wi-Fi speed tests and find better places to work remotely in Hanoi and Ho Chi Minh City.',
+    url: 'https://speedphe.rrchs.fr',
+    siteName: 'Casphe',
+    type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Casphe | Find Cafes With Fast Wi-Fi for Work',
+    description:
+      'Compare real cafe Wi-Fi speed tests and find better places to work remotely in Hanoi and Ho Chi Minh City.',
+  },
 };
 
 export default function RootLayout({

@@ -1,287 +1,62 @@
-'use client';
-
-import { useCallback, useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
-import { MenuIcon } from '@/components/Icons';
-import { MapLoadingFallback } from '@/components/home/MapLoadingFallback';
-import { PlaceDetailsPanel } from '@/components/home/PlaceDetailsPanel';
-import { PlacesSidebar } from '@/components/home/PlacesSidebar';
-import type { DiscoverablePlace } from '@/lib/db';
-import { createLoggedClientError, isLoggedClientError, logClientError } from '@/lib/logging';
-
-const DEFAULT_LOCATION = { lat: 48.8566, lng: 2.3522 };
-
-interface Coordinates {
-  lat: number;
-  lng: number;
-}
-
-const Map = dynamic(() => import('@/components/Map'), {
-  ssr: false,
-  loading: () => <MapLoadingFallback />,
-});
+import Link from 'next/link';
+import { HomeExperience } from '@/components/home/HomeExperience';
+import { CITIES } from '@/lib/cities';
 
 export default function Home() {
-  const [places, setPlaces] = useState<DiscoverablePlace[]>([]);
-  const [selectedPlace, setSelectedPlace] = useState<DiscoverablePlace | null>(null);
-  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
-  const [mapViewport, setMapViewport] = useState<{
-    lat: number;
-    lng: number;
-    radiusKm: number;
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  } | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
-  const [placesError, setPlacesError] = useState<string | null>(null);
-
-  const loadViewportPlaces = useCallback(
-    async (viewport: {
-      lat: number;
-      lng: number;
-      radiusKm: number;
-      north: number;
-      south: number;
-      east: number;
-      west: number;
-    }) => {
-      setIsLoading(true);
-      setPlacesError(null);
-
-      try {
-        const params = new URLSearchParams({
-          lat: String(viewport.lat),
-          lng: String(viewport.lng),
-          radius: String(viewport.radiusKm),
-          north: String(viewport.north),
-          south: String(viewport.south),
-          east: String(viewport.east),
-          west: String(viewport.west),
-        });
-        const response = await fetch(`/api/places?${params.toString()}`);
-        const data: { error?: string; places?: DiscoverablePlace[]; requestId?: string } =
-          await response.json();
-
-        if (!response.ok) {
-          const errorMessage = data.error ?? 'Failed to load places';
-
-          logClientError('client.fetch.error', {
-            action: 'places.load_nearby',
-            endpoint: '/api/places',
-            status: response.status,
-            requestId: data.requestId,
-            message: errorMessage,
-          });
-          throw createLoggedClientError(errorMessage);
-        }
-
-        const nextPlaces = data.places ?? [];
-
-        setPlaces(nextPlaces);
-        setSelectedPlace((currentSelectedPlace) => {
-          if (!currentSelectedPlace) {
-            return currentSelectedPlace;
-          }
-
-          return (
-            nextPlaces.find(
-              (place) => place.google_place_id === currentSelectedPlace.google_place_id
-            ) ?? currentSelectedPlace
-          );
-        });
-      } catch (error) {
-        if (!isLoggedClientError(error)) {
-          logClientError('client.fetch.error', {
-            action: 'places.load_viewport',
-            endpoint: '/api/places',
-            message: error instanceof Error ? error.message : 'Failed to load places',
-          });
-        }
-        setPlacesError(error instanceof Error ? error.message : 'Failed to load places');
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    []
-  );
-
-  useEffect(() => {
-    const initializeLocation = (location: Coordinates) => {
-      setUserLocation(location);
-    };
-
-    if (!navigator.geolocation) {
-      logClientError('geolocation.fallback', {
-        reason: 'unsupported',
-      });
-      initializeLocation(DEFAULT_LOCATION);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        initializeLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-      },
-      () => {
-        logClientError('geolocation.fallback', {
-          reason: 'permission_denied_or_unavailable',
-        });
-        initializeLocation(DEFAULT_LOCATION);
-      }
-    );
-  }, []);
-
-  const handleCloseSelectedPlace = useCallback(() => {
-    setSelectedPlace(null);
-  }, []);
-
-  const handlePlaceSelect = useCallback((place: DiscoverablePlace) => {
-    setSelectedPlace(place);
-
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      setSidebarOpen(false);
-    }
-  }, []);
-
-  const handleRefreshPlaces = useCallback(() => {
-    if (!mapViewport) {
-      return;
-    }
-
-    void loadViewportPlaces(mapViewport);
-  }, [loadViewportPlaces, mapViewport]);
-
-  const handleSpeedtestComplete = useCallback(() => {
-    if (!mapViewport) {
-      return;
-    }
-
-    void loadViewportPlaces(mapViewport);
-  }, [loadViewportPlaces, mapViewport]);
-
-  const handlePlaceResolved = useCallback((place: DiscoverablePlace) => {
-    setSelectedPlace(place);
-    setPlaces((currentPlaces) =>
-      currentPlaces
-        .map((currentPlace) =>
-          currentPlace.google_place_id === place.google_place_id
-            ? {
-                ...currentPlace,
-                ...place,
-                isSpeedtested: true,
-              }
-            : currentPlace
-        )
-        .sort((left, right) => {
-          if (left.isSpeedtested !== right.isSpeedtested) {
-            return left.isSpeedtested ? -1 : 1;
-          }
-
-          return left.distance_km - right.distance_km;
-        })
-    );
-  }, []);
-
-  const handleViewportChange = useCallback(
-    (viewport: {
-      lat: number;
-      lng: number;
-      radiusKm: number;
-      north: number;
-      south: number;
-      east: number;
-      west: number;
-    }) => {
-      setMapViewport((currentViewport) => {
-        const latChanged = !currentViewport || Math.abs(currentViewport.lat - viewport.lat) > 0.001;
-        const lngChanged = !currentViewport || Math.abs(currentViewport.lng - viewport.lng) > 0.001;
-        const radiusChanged =
-          !currentViewport || Math.abs(currentViewport.radiusKm - viewport.radiusKm) > 0.5;
-        const northChanged =
-          !currentViewport || Math.abs(currentViewport.north - viewport.north) > 0.001;
-        const southChanged =
-          !currentViewport || Math.abs(currentViewport.south - viewport.south) > 0.001;
-        const eastChanged =
-          !currentViewport || Math.abs(currentViewport.east - viewport.east) > 0.001;
-        const westChanged =
-          !currentViewport || Math.abs(currentViewport.west - viewport.west) > 0.001;
-
-        if (
-          !latChanged &&
-          !lngChanged &&
-          !radiusChanged &&
-          !northChanged &&
-          !southChanged &&
-          !eastChanged &&
-          !westChanged
-        ) {
-          return currentViewport;
-        }
-
-        void loadViewportPlaces(viewport);
-        return viewport;
-      });
-    },
-    [loadViewportPlaces]
-  );
-
   return (
-    <div className="flex h-screen overflow-hidden bg-[#FAFAFA]">
-      <div
-        className={[
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-          'fixed z-20 flex h-full w-[320px] flex-col transition-transform duration-300 ease-in-out md:relative md:w-[360px] md:translate-x-0',
-        ].join(' ')}
-      >
-        <PlacesSidebar
-          places={places}
-          selectedPlace={selectedPlace}
-          isLoading={isLoading}
-          error={placesError}
-          onPlaceSelect={handlePlaceSelect}
-          onRefresh={handleRefreshPlaces}
-        />
-      </div>
+    <main className="bg-[#f6f1e8] text-[#1f1a17]">
+      <section className="border-b border-black/10 bg-[radial-gradient(circle_at_top_left,_rgba(204,120,52,0.18),_transparent_28%),linear-gradient(135deg,_#f7efe3_0%,_#efe4d3_48%,_#f8f4ee_100%)]">
+        <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-16 lg:flex-row lg:items-end lg:justify-between lg:px-8">
+          <div className="max-w-3xl">
+            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-[#9a5320]">
+              Measured cafe Wi-Fi for work
+            </p>
+            <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-[#241a14] md:text-6xl">
+              Find cafes with the fastest Wi-Fi before you open your laptop.
+            </h1>
+            <p className="mt-5 max-w-2xl text-lg leading-8 text-[#4f433b]">
+              Casphe helps remote workers, freelancers, and students compare real speed test data
+              from cafes. Start with Hanoi and Ho Chi Minh City, then explore nearby spots on the
+              live map.
+            </p>
+          </div>
 
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-10 bg-black/30 backdrop-blur-sm md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+          <div className="grid w-full max-w-xl gap-4 sm:grid-cols-2">
+            {CITIES.map((city) => (
+              <Link
+                key={city.slug}
+                href={`/cities/${city.slug}`}
+                className="group rounded-[1.75rem] border border-black/10 bg-white/80 p-5 shadow-[0_10px_30px_rgba(31,26,23,0.08)] backdrop-blur-sm transition-transform duration-200 hover:-translate-y-1"
+              >
+                <p className="text-sm font-medium text-[#9a5320]">City guide</p>
+                <h2 className="mt-2 text-2xl font-semibold text-[#241a14]">{city.name}</h2>
+                <p className="mt-3 text-sm leading-6 text-[#5f5248]">{city.intro}</p>
+                <p className="mt-4 text-sm font-semibold text-[#241a14] group-hover:text-[#9a5320]">
+                  Explore {city.name}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      <div className="relative flex-1">
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="absolute top-4 left-4 z-[5] flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-md transition-all hover:bg-gray-50 active:scale-95 md:hidden"
-        >
-          <MenuIcon />
-        </button>
-
-        {userLocation && (
-          <Map
-            places={places}
-            userLocation={userLocation}
-            onPlaceSelect={handlePlaceSelect}
-            onViewportChange={handleViewportChange}
-          />
-        )}
-
-        {selectedPlace && (
-          <PlaceDetailsPanel
-            place={selectedPlace}
-            onClose={handleCloseSelectedPlace}
-            onSpeedtestComplete={handleSpeedtestComplete}
-            onPlaceResolved={handlePlaceResolved}
-          />
-        )}
-      </div>
-    </div>
+      <section className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
+        <div className="mb-6 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight text-[#241a14]">Live cafe map</h2>
+            <p className="max-w-3xl text-sm leading-6 text-[#5f5248]">
+              Browse nearby cafes, submit new speed tests, and compare tested spots against newly
+              discovered places from the map.
+            </p>
+          </div>
+          <p className="text-sm text-[#7a6b61]">
+            Speed-tested cafes stay pinned above untested discoveries.
+          </p>
+        </div>
+        <div className="overflow-hidden rounded-[2rem] border border-black/10 shadow-[0_20px_50px_rgba(31,26,23,0.08)]">
+          <HomeExperience />
+        </div>
+      </section>
+    </main>
   );
 }
