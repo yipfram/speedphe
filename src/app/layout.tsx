@@ -12,10 +12,12 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const OG_IMAGE_URL = 'https://speedphe.rrchs.fr/opengraph-image';
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://speedphe.rrchs.fr'),
   title: {
-    default: 'Casphe | Fast Wi-Fi Cafes for Remote Work in Vietnam',
+    default: 'Casphe | Find Fast Wi-Fi Cafes for Remote Work in Vietnam',
     template: '%s | Casphe',
   },
   description:
@@ -24,7 +26,7 @@ export const metadata: Metadata = {
     canonical: '/',
   },
   openGraph: {
-    title: 'Casphe | Fast Wi-Fi Cafes for Remote Work in Vietnam',
+    title: 'Casphe | Find Fast Wi-Fi Cafes for Remote Work in Vietnam',
     description:
       'Compare real cafe Wi-Fi speed tests and find better places to work remotely in Hanoi and Ho Chi Minh City.',
     url: 'https://speedphe.rrchs.fr',
@@ -33,7 +35,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     images: [
       {
-        url: '/opengraph-image',
+        url: OG_IMAGE_URL,
         width: 1200,
         height: 630,
         alt: 'Casphe map of cafes with fast Wi-Fi for remote work',
@@ -42,10 +44,10 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Casphe | Fast Wi-Fi Cafes for Remote Work in Vietnam',
+    title: 'Casphe | Find Fast Wi-Fi Cafes for Remote Work in Vietnam',
     description:
       'Compare real cafe Wi-Fi speed tests and find better places to work remotely in Hanoi and Ho Chi Minh City.',
-    images: ['/opengraph-image'],
+    images: [OG_IMAGE_URL],
   },
 };
 

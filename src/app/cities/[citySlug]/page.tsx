@@ -5,6 +5,7 @@ import { CITIES, getCityBySlug } from '@/lib/cities';
 import { getCityPageData } from '@/lib/city-seo';
 
 const BASE_URL = 'https://speedphe.rrchs.fr';
+const OG_IMAGE_URL = 'https://speedphe.rrchs.fr/opengraph-image';
 
 function formatNumber(value: number | null, digits = 1) {
   return value == null ? 'N/A' : value.toFixed(digits);
@@ -73,7 +74,7 @@ export async function generateMetadata({
       type: 'article',
       images: [
         {
-          url: '/opengraph-image',
+          url: OG_IMAGE_URL,
           width: 1200,
           height: 630,
           alt: `Casphe guide for cafes with fast Wi-Fi in ${city.name}`,
@@ -84,7 +85,7 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title: city.title,
       description: city.description,
-      images: ['/opengraph-image'],
+      images: [OG_IMAGE_URL],
     },
     keywords: city.keywords,
   };

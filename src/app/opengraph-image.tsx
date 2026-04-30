@@ -63,27 +63,28 @@ export default function OpenGraphImage() {
             <div
               style={{
                 display: 'flex',
-                fontSize: 68,
+                fontSize: 72,
                 fontWeight: 700,
                 letterSpacing: '-0.04em',
                 lineHeight: 1,
               }}
             >
-              Find cafes with fast Wi-Fi for remote work.
+              Find the best cafes with fast Wi-Fi for remote work.
             </div>
             <div
               style={{
                 color: '#5f5248',
                 display: 'flex',
-                fontSize: 30,
+                fontSize: 28,
                 lineHeight: 1.35,
               }}
             >
-              Compare real speed test data across Hanoi and Ho Chi Minh City.
+              Compare real speed tests across Hanoi and Ho Chi Minh City before you go.
             </div>
           </div>
           <div
             style={{
+              alignItems: 'center',
               display: 'flex',
               gap: 16,
             }}
@@ -91,6 +92,20 @@ export default function OpenGraphImage() {
             <Badge label="Hanoi" />
             <Badge label="Ho Chi Minh City" />
             <Badge label="Call / Gaming / Streaming" />
+            <div
+              style={{
+                alignItems: 'center',
+                background: '#241a14',
+                borderRadius: 9999,
+                color: '#fffaf3',
+                display: 'flex',
+                fontSize: 22,
+                fontWeight: 700,
+                padding: '12px 20px',
+              }}
+            >
+              Explore the map
+            </div>
           </div>
         </div>
 

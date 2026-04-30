@@ -27,7 +27,7 @@ export const CITIES: CityConfig[] = [
     name: 'Hanoi',
     country: 'Vietnam',
     regionName: 'Hanoi',
-    title: 'Best Cafes With Fast Wi-Fi for Work in Hanoi',
+    title: 'Best Cafes With Fast Wi-Fi for Remote Work in Hanoi',
     description:
       'Compare the best measured cafe Wi-Fi in Hanoi. Find work-friendly cafes with strong download speeds, lower latency, and recent tests.',
     intro:
@@ -49,7 +49,7 @@ export const CITIES: CityConfig[] = [
     name: 'Ho Chi Minh City',
     country: 'Vietnam',
     regionName: 'Ho Chi Minh City',
-    title: 'Best Cafes With Fast Wi-Fi for Work in Ho Chi Minh City',
+    title: 'Best Cafes With Fast Wi-Fi for Remote Work in Ho Chi Minh City',
     description:
       'Find the top tested cafe Wi-Fi in Ho Chi Minh City. Compare internet speeds, latency, and recent results before choosing where to work.',
     intro:
