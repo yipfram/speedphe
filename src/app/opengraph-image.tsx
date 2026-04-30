@@ -16,7 +16,7 @@ export default function OpenGraphImage() {
         color: '#241a14',
         display: 'flex',
         height: '100%',
-        padding: '54px',
+        padding: '44px',
         width: '100%',
       }}
     >
@@ -25,12 +25,12 @@ export default function OpenGraphImage() {
           background:
             'radial-gradient(circle at top left, rgba(204, 120, 52, 0.28), transparent 32%)',
           border: '1px solid rgba(36, 26, 20, 0.08)',
-          borderRadius: '36px',
+          borderRadius: '32px',
           display: 'flex',
           flex: 1,
           justifyContent: 'space-between',
           overflow: 'hidden',
-          padding: '44px',
+          padding: '38px',
         }}
       >
         <div
@@ -38,16 +38,16 @@ export default function OpenGraphImage() {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            maxWidth: '650px',
+            maxWidth: '620px',
           }}
         >
           <div
             style={{
               color: '#9a5320',
               display: 'flex',
-              fontSize: 24,
+              fontSize: 20,
               fontWeight: 700,
-              letterSpacing: '0.28em',
+              letterSpacing: '0.22em',
               textTransform: 'uppercase',
             }}
           >
@@ -63,48 +63,55 @@ export default function OpenGraphImage() {
             <div
               style={{
                 display: 'flex',
-                fontSize: 72,
+                fontSize: 60,
                 fontWeight: 700,
                 letterSpacing: '-0.04em',
-                lineHeight: 1,
+                lineHeight: 1.02,
               }}
             >
-              Find the best cafes with fast Wi-Fi for remote work.
+              Find fast Wi-Fi cafes for remote work.
             </div>
             <div
               style={{
                 color: '#5f5248',
                 display: 'flex',
-                fontSize: 28,
-                lineHeight: 1.35,
+                fontSize: 24,
+                lineHeight: 1.3,
+                maxWidth: '560px',
               }}
             >
-              Compare real speed tests across Hanoi and Ho Chi Minh City before you go.
+              Compare real speed tests in Hanoi and Ho Chi Minh City before you go.
             </div>
           </div>
           <div
             style={{
-              alignItems: 'center',
               display: 'flex',
-              gap: 16,
+              flexDirection: 'column',
+              gap: 18,
             }}
           >
-            <Badge label="Hanoi" />
-            <Badge label="Ho Chi Minh City" />
-            <Badge label="Call / Gaming / Streaming" />
             <div
               style={{
-                alignItems: 'center',
                 background: '#241a14',
                 borderRadius: 9999,
                 color: '#fffaf3',
                 display: 'flex',
-                fontSize: 22,
+                fontSize: 20,
                 fontWeight: 700,
-                padding: '12px 20px',
+                padding: '12px 18px',
+                alignSelf: 'flex-start',
               }}
             >
-              Explore the map
+              See top tested cafes
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                gap: 12,
+              }}
+            >
+              <Badge label="Hanoi" />
+              <Badge label="Ho Chi Minh City" />
             </div>
           </div>
         </div>
@@ -114,7 +121,7 @@ export default function OpenGraphImage() {
             alignItems: 'center',
             display: 'flex',
             justifyContent: 'center',
-            minWidth: 320,
+            minWidth: 300,
             position: 'relative',
           }}
         >
@@ -122,18 +129,43 @@ export default function OpenGraphImage() {
             style={{
               background: '#fffaf3',
               border: '1px solid rgba(36, 26, 20, 0.08)',
-              borderRadius: '30px',
+              borderRadius: '28px',
               boxShadow: '0 24px 60px rgba(31, 26, 23, 0.12)',
               display: 'flex',
               flexDirection: 'column',
-              gap: 18,
-              padding: '26px 24px',
-              width: 290,
+              gap: 14,
+              padding: '22px 20px',
+              width: 270,
             }}
           >
+            <div
+              style={{
+                color: '#9a5320',
+                display: 'flex',
+                fontSize: 16,
+                fontWeight: 700,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Work-fit snapshot
+            </div>
             <Metric label="Download" value="82 Mbps" tone="#1d9f5a" />
             <Metric label="Upload" value="41 Mbps" tone="#9a5320" />
             <Metric label="Latency" value="18 ms" tone="#d5a021" />
+            <div
+              style={{
+                borderTop: '1px solid rgba(36, 26, 20, 0.08)',
+                color: '#5f5248',
+                display: 'flex',
+                fontSize: 18,
+                fontWeight: 600,
+                marginTop: '2px',
+                paddingTop: '14px',
+              }}
+            >
+              Great for calls and focused work
+            </div>
           </div>
         </div>
       </div>
@@ -151,9 +183,9 @@ function Badge({ label }: { label: string }) {
         borderRadius: 9999,
         color: '#241a14',
         display: 'flex',
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: 600,
-        padding: '12px 18px',
+        padding: '10px 14px',
       }}
     >
       {label}
@@ -174,7 +206,7 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: st
         style={{
           color: '#6b5c51',
           display: 'flex',
-          fontSize: 22,
+          fontSize: 18,
           fontWeight: 500,
         }}
       >
@@ -184,7 +216,7 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: st
         style={{
           color: tone,
           display: 'flex',
-          fontSize: 28,
+          fontSize: 24,
           fontWeight: 700,
         }}
       >

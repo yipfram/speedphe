@@ -39,9 +39,18 @@ The app reads these variables from `.env`:
 # PostgreSQL
 DATABASE_URL=postgresql://user:password@localhost:5432/speedphe
 
+# Public base URL for metadata, canonical links, OG/Twitter images, sitemap, and robots
+NEXT_PUBLIC_URL=http://localhost:3000
+
 # Optional Google Places API key
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
 ```
+
+Set `NEXT_PUBLIC_URL` to the real public URL of each deployment:
+
+- local: `http://localhost:3000`
+- production: `https://speedphe.rrchs.fr`
+- branch deploys: the full Coolify branch URL for that environment
 
 ## Bun Commands
 
@@ -80,6 +89,7 @@ POSTGRES_PORT=5432
 POSTGRES_DB=casphe
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
+NEXT_PUBLIC_URL=http://localhost:3000
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 ```
 
@@ -105,6 +115,7 @@ docker build -t casphe .
 
 - The image is built with Bun and runs the standalone Next.js server with Bun.
 - `DATABASE_URL` is required at runtime.
+- `NEXT_PUBLIC_URL` should match the deployment's public URL.
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is optional.
 - No automatic schema migration is performed on startup.
 

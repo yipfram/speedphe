@@ -3,9 +3,10 @@ import { notFound } from 'next/navigation';
 import { CityMap } from '@/components/cities/CityMap';
 import { CITIES, getCityBySlug } from '@/lib/cities';
 import { getCityPageData } from '@/lib/city-seo';
+import { getAbsoluteUrl, getPublicUrl } from '@/lib/site-url';
 
-const BASE_URL = 'https://speedphe.rrchs.fr';
-const OG_IMAGE_URL = 'https://speedphe.rrchs.fr/opengraph-image';
+const BASE_URL = getPublicUrl();
+const OG_IMAGE_URL = getAbsoluteUrl('/opengraph-image');
 
 function formatNumber(value: number | null, digits = 1) {
   return value == null ? 'N/A' : value.toFixed(digits);

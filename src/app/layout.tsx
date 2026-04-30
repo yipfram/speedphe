@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { getAbsoluteUrl, getPublicUrl, getPublicUrlObject } from '@/lib/site-url';
 import './globals.css';
 
 const geistSans = Geist({
@@ -12,10 +13,11 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-const OG_IMAGE_URL = 'https://speedphe.rrchs.fr/opengraph-image';
+const PUBLIC_URL = getPublicUrl();
+const OG_IMAGE_URL = getAbsoluteUrl('/opengraph-image');
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://speedphe.rrchs.fr'),
+  metadataBase: getPublicUrlObject(),
   title: {
     default: 'Casphe | Find Fast Wi-Fi Cafes for Remote Work in Vietnam',
     template: '%s | Casphe',
@@ -29,7 +31,7 @@ export const metadata: Metadata = {
     title: 'Casphe | Find Fast Wi-Fi Cafes for Remote Work in Vietnam',
     description:
       'Compare real cafe Wi-Fi speed tests and find better places to work remotely in Hanoi and Ho Chi Minh City.',
-    url: 'https://speedphe.rrchs.fr',
+    url: PUBLIC_URL,
     siteName: 'Casphe',
     type: 'website',
     locale: 'en_US',
